@@ -9,6 +9,7 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import logging
 import os
+import datetime
 
 # Our imports
 from data_utils import get_dataLoader
@@ -21,6 +22,8 @@ else:
     print("The code will run on CPU. Go to Edit->Notebook Settings and choose GPU as the hardware accelerator")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
 if not os.path.exists('logs'):
    os.makedirs('logs')
 
@@ -28,7 +31,7 @@ if not os.path.exists('trained_models'):
    os.makedirs('trained_models')
 
 # Get model. Can be found in model folder
-log_path = "logs/training.log"
+log_path = f"logs/training_{current_time}.log"
 logging.basicConfig(filename=log_path, level=logging.INFO)
 
 model = Network()
