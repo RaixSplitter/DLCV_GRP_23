@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 
 02514/*
+trained_models/*

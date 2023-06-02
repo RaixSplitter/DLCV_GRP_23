@@ -7,6 +7,8 @@ import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
+import logging
+import os
 
 # Our imports
 from data_utils import get_dataLoader
@@ -19,15 +21,29 @@ else:
     print("The code will run on CPU. Go to Edit->Notebook Settings and choose GPU as the hardware accelerator")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+if not os.path.exists('logs'):
+   os.makedirs('logs')
+
+if not os.path.exists('trained_models'):
+   os.makedirs('trained_models')
+
 # Get model. Can be found in model folder
+log_path = "logs/training.log"
+logging.basicConfig(filename=log_path, level=logging.INFO)
+
 model = Network()
 model.to(device)
 
-trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = False, batch_size = 64)
+# Hyper parameters
+learning_rate = 0.001
+num_epochs = 2
+batch_size = 64
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
+trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = False, batch_size = batch_size)
 
 # Train function
-def train(model, optimizer, num_epochs=10):
+def train(model, optimizer, num_epochs=num_epochs):
 
     def loss_fun(output, target):
         target_one_hot = F.one_hot(target, num_classes=2).float()
@@ -77,11 +93,14 @@ def train(model, optimizer, num_epochs=10):
         out_dict['test_loss'].append(np.mean(test_loss))
         print(f"Loss train: {np.mean(train_loss):.3f}\t test: {np.mean(test_loss):.3f}\t",
               f"Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%\t test: {out_dict['test_acc'][-1]*100:.1f}%")
+        
+        logging.info(f"Epoch: {epoch}, Loss train: {np.mean(train_loss):.3f}, Loss test: {np.mean(test_loss):.3f}, Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%, Accuracy test: {out_dict['test_acc'][-1]*100:.1f}%")
+    logging.info(f"RUN FINISHED")
     return out_dict
-
-#optimizer
-learning_rate = 0.001
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 #Train
 out_dict = train(model, optimizer)
+
+#Save model
+save_model_path = f"trained_models/Network_model.pth"
+torch.save(model.state_dict(), save_model_path)
