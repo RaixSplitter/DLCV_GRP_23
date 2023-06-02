@@ -30,7 +30,9 @@ trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = False, 
 def train(model, optimizer, num_epochs=10):
 
     def loss_fun(output, target):
-        return F.cross_entropy(output, target)
+        target_one_hot = F.one_hot(target, num_classes=2).float()
+        return F.binary_cross_entropy_with_logits(output, target_one_hot)
+
     out_dict = {'train_acc': [],
               'test_acc': [],
               'train_loss': [],
