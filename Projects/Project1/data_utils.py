@@ -2,14 +2,11 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import os
 
-def get_dataLoader(data_aug = False):
+def get_dataLoader(data_aug = False, batch_size = 64):
 
     current_path = os.getcwd()
     train_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'train')
     test_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'test')
-
-    train_data = datasets.ImageFolder(train_path, transform=transform)
-    test_data = datasets.ImageFolder(test_path, transform=transform)
     
     if data_aug == True:
         transform = transforms.Compose([
@@ -26,5 +23,11 @@ def get_dataLoader(data_aug = False):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # normalization settings for RGB
     ])
 
+    train_data = datasets.ImageFolder(train_path, transform=transform)
+    test_data = datasets.ImageFolder(test_path, transform=transform)
 
-    return train_data, test_data
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+
+
+    return train_loader, test_loader
