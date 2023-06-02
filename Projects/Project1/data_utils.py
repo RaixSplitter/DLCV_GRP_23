@@ -23,11 +23,11 @@ def get_dataLoader(data_aug = False, batch_size = 64):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # normalization settings for RGB
     ])
 
-    train_data = datasets.ImageFolder(train_path, transform=transform)
-    test_data = datasets.ImageFolder(test_path, transform=transform)
+    trainset = datasets.ImageFolder(train_path, transform=transform)
+    testset = datasets.ImageFolder(test_path, transform=transform)
 
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(testset, batch_size=batch_size, shuffle=False)
 
 
-    return train_loader, test_loader
+    return trainset, testset, train_loader, test_loader

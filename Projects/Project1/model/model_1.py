@@ -36,12 +36,12 @@ class Network(nn.Module):
         
         self.fully_connected = nn.Sequential(
             nn.Dropout(p=0.1),
-            nn.Linear(4096, 1024),
+            nn.Linear(200704, 1024),
             nn.ReLU(),
             nn.Linear(1024, 512),
             nn.ReLU(),
             nn.Dropout(p=0.1),
-            nn.Linear(512, 10),
+            nn.Linear(512, 2),
             )
         
     def forward(self, x):
