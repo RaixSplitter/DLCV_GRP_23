@@ -10,10 +10,11 @@ import matplotlib.pyplot as plt
 import logging
 import os
 import datetime
+from sklearn.metrics import f1_score
 
 # Our imports
 from data_utils import get_dataLoader
-from model.model_1 import Network
+from model.model_P import Network
 from model.resnet18 import resnet18
 
 #Setup Device
@@ -35,20 +36,22 @@ if not os.path.exists('trained_models'):
 log_path = f"logs/training_{current_time}.log"
 logging.basicConfig(filename=log_path, level=logging.INFO)
 
-#model = Network()
-model = resnet18()
+model = Network()
+#model = resnet18()
 model.to(device)
 
 # Hyper parameters
-learning_rate = 0.001
+learning_rate = 0.1
 num_epochs = 20
 batch_size = 64
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
 # Define the learning rate scheduler
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = True, batch_size = batch_size)
+
+from sklearn.metrics import f1_score
 
 # Train function
 def train(model, optimizer, scheduler, num_epochs=num_epochs):
@@ -60,37 +63,43 @@ def train(model, optimizer, scheduler, num_epochs=num_epochs):
     out_dict = {'train_acc': [],
               'test_acc': [],
               'train_loss': [],
-              'test_loss': []}
+              'test_loss': [],
+              'train_f1': [],
+              'test_f1': []}
   
-    for epoch in tqdm(range(num_epochs), unit='epoch'):
+    for epoch in range(num_epochs):
         model.train()
-        #For each epoch
+        # For each epoch
         train_correct = 0
         train_loss = []
-        for minibatch_no, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
+        train_labels, train_preds = [], []  # Collect true and predicted labels
+        for minibatch_no, (data, target) in enumerate(train_loader):
             data, target = data.to(device), target.to(device)
-            #Zero the gradients computed for each weight
+            # Zero the gradients computed for each weight
             optimizer.zero_grad()
-            #Forward pass your image through the network
+            # Forward pass your image through the network
             output = model(data)
-            #Compute the loss
+            # Compute the loss
             loss = loss_fun(output, target)
-            #Backward pass through the network
+            # Backward pass through the network
             loss.backward()
-            #Update the weights
+            # Update the weights
             optimizer.step()
 
             train_loss.append(loss.item())
-            #Compute how many were correctly classified
+            # Compute how many were correctly classified
             predicted = output.argmax(1)
             train_correct += (target==predicted).sum().cpu().item()
-        
+            train_labels.extend(target.cpu().numpy())
+            train_preds.extend(predicted.cpu().numpy())
+
         # Step the learning rate scheduler
         scheduler.step()
 
-        #Compute the test accuracy
+        # Compute the test accuracy
         test_loss = []
         test_correct = 0
+        test_labels, test_preds = [], []  # Collect true and predicted labels
         model.eval()
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
@@ -99,21 +108,35 @@ def train(model, optimizer, scheduler, num_epochs=num_epochs):
             test_loss.append(loss_fun(output, target).cpu().item())
             predicted = output.argmax(1)
             test_correct += (target==predicted).sum().cpu().item()
+            test_labels.extend(target.cpu().numpy())
+            test_preds.extend(predicted.cpu().numpy())
+
+        # Compute F1 scores
+        train_f1 = f1_score(train_labels, train_preds, average='macro')
+        test_f1 = f1_score(test_labels, test_preds, average='macro')
+
         out_dict['train_acc'].append(train_correct/len(trainset))
         out_dict['test_acc'].append(test_correct/len(testset))
         out_dict['train_loss'].append(np.mean(train_loss))
         out_dict['test_loss'].append(np.mean(test_loss))
+        out_dict['train_f1'].append(train_f1)
+        out_dict['test_f1'].append(test_f1)
+
         print(f"Loss train: {np.mean(train_loss):.3f}\t test: {np.mean(test_loss):.3f}\t",
-              f"Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%\t test: {out_dict['test_acc'][-1]*100:.1f}%")
-        
-        logging.info(f"Epoch: {epoch}, Loss train: {np.mean(train_loss):.3f}, Loss test: {np.mean(test_loss):.3f}, Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%, Accuracy test: {out_dict['test_acc'][-1]*100:.1f}%")
+              f"Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%\t test: {out_dict['test_acc'][-1]*100:.1f}%\t",
+              f"F1 train: {out_dict['train_f1'][-1]*100:.1f}%\t test: {out_dict['test_f1'][-1]*100:.1f}%\t",
+              f"Epoch: {epoch+1}/{num_epochs}")
+
+        logging.info(f"Epoch: {epoch}, Loss train: {np.mean(train_loss):.3f}, Loss test: {np.mean(test_loss):.3f}, Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%, Accuracy test: {out_dict['test_acc'][-1]*100:.1f}%, F1 train: {out_dict['train_f1'][-1]*100:.1f}%, F1 test: {out_dict['test_f1'][-1]*100:.1f}%")
+
     logging.info(f"RUN FINISHED")
     return out_dict
+
 
 #Train
 out_dict = train(model, optimizer, scheduler)
 
 
 #Save model
-save_model_path = f"trained_models/Network_model.pth"
+save_model_path = f"trained_models/our_model.pth"
 torch.save(model.state_dict(), save_model_path)
