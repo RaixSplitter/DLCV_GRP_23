@@ -4,6 +4,11 @@ import os
 import matplotlib.pyplot as plt
 import re
 
+basic_transform = transforms.Compose([
+        transforms.Resize((224,224)), # resizing to same size, for example 224x224
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]) # normalization settings for RGB
+
 def get_dataLoader(data_aug = False, batch_size = 64):
 
     current_path = os.getcwd()
@@ -20,11 +25,7 @@ def get_dataLoader(data_aug = False, batch_size = 64):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # normalization settings for RGB
     ])
     else: 
-        transform = transforms.Compose([
-        transforms.Resize((224,224)), # resizing to same size, for example 224x224
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # normalization settings for RGB
-    ])
+        transform = basic_transform
 
     trainset = datasets.ImageFolder(train_path, transform=transform)
     testset = datasets.ImageFolder(test_path, transform=transform)
