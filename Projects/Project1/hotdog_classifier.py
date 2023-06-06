@@ -52,8 +52,6 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = True, batch_size = batch_size)
 
-from sklearn.metrics import f1_score
-
 # Train function
 def train(model, optimizer, scheduler, num_epochs=num_epochs):
 
@@ -123,6 +121,9 @@ def train(model, optimizer, scheduler, num_epochs=num_epochs):
         out_dict['train_f1'].append(train_f1)
         out_dict['test_f1'].append(test_f1)
 
+        if (epoch + 1) % 5 == 0:
+            torch.save(model.state_dict(), f'model_{epoch+1}.pth')
+
         print(f"Loss train: {np.mean(train_loss):.3f}\t test: {np.mean(test_loss):.3f}\t",
               f"Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%\t test: {out_dict['test_acc'][-1]*100:.1f}%\t",
               f"F1 train: {out_dict['train_f1'][-1]*100:.1f}%\t test: {out_dict['test_f1'][-1]*100:.1f}%\t",
@@ -136,7 +137,6 @@ def train(model, optimizer, scheduler, num_epochs=num_epochs):
 
 #Train
 out_dict = train(model, optimizer, scheduler)
-
 
 #Save model
 save_model_path = f"trained_models/our_model.pth"
