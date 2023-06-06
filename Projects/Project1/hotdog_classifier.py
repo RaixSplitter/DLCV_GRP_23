@@ -44,11 +44,14 @@ learning_rate = 0.001
 num_epochs = 20
 batch_size = 64
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-#exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+
+# Define the learning rate scheduler
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+
 trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = True, batch_size = batch_size)
 
 # Train function
-def train(model, optimizer, num_epochs=num_epochs):
+def train(model, optimizer, scheduler, num_epochs=num_epochs):
 
     def loss_fun(output, target):
         target_one_hot = F.one_hot(target, num_classes=2).float()
@@ -81,7 +84,11 @@ def train(model, optimizer, num_epochs=num_epochs):
             #Compute how many were correctly classified
             predicted = output.argmax(1)
             train_correct += (target==predicted).sum().cpu().item()
-        #Comput the test accuracy
+        
+        # Step the learning rate scheduler
+        scheduler.step()
+
+        #Compute the test accuracy
         test_loss = []
         test_correct = 0
         model.eval()
@@ -104,7 +111,8 @@ def train(model, optimizer, num_epochs=num_epochs):
     return out_dict
 
 #Train
-out_dict = train(model, optimizer)
+out_dict = train(model, optimizer, scheduler)
+
 
 #Save model
 save_model_path = f"trained_models/Network_model.pth"
