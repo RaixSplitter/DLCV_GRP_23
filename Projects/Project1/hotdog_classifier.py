@@ -14,6 +14,7 @@ import datetime
 # Our imports
 from data_utils import get_dataLoader
 from model.model_1 import Network
+from model.resnet18 import resnet18
 
 #Setup Device
 if torch.cuda.is_available():
@@ -34,16 +35,17 @@ if not os.path.exists('trained_models'):
 log_path = f"logs/training_{current_time}.log"
 logging.basicConfig(filename=log_path, level=logging.INFO)
 
-model = Network()
+#model = Network()
+model = resnet18()
 model.to(device)
 
 # Hyper parameters
 learning_rate = 0.001
-num_epochs = 2
+num_epochs = 20
 batch_size = 64
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = False, batch_size = batch_size)
+#exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+trainset, testset, train_loader, test_loader = get_dataLoader(data_aug = True, batch_size = batch_size)
 
 # Train function
 def train(model, optimizer, num_epochs=num_epochs):
