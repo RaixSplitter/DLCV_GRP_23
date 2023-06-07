@@ -53,7 +53,7 @@ def check_problematic_images(model):
 
 
 def test(model):
-    _, _, test_set, test_loader = get_dataLoader()
+    _, _, _, test_loader = get_dataLoader()
 
     def loss_fun(output, target):
         target_one_hot = F.one_hot(target, num_classes=2).float()
@@ -62,7 +62,9 @@ def test(model):
     test_loss = []
     test_correct = 0
     test_labels, test_preds, test_outs = [], [], []
+    images = 0
     for data, target in test_loader:
+        images += len(data)
         data, target = data.to(device), target.to(device)
         with torch.no_grad():
             output = model(data)
@@ -75,7 +77,7 @@ def test(model):
         test_preds.extend(predicted.cpu().numpy())
         
     test_f1 = f1_score(test_labels, test_preds, average='macro')
-    test_acc = test_correct/len(test_loader)
+    test_acc = test_correct/images
     test_auc = roc_auc_score(test_labels, np.array(test_outs)[:,1])
 
     return test_acc, test_f1, test_auc
@@ -86,7 +88,13 @@ if __name__ == '__main__':
         if len(args) == 2:
             model_name = args[1]
             model = Network()
-            model.load_state_dict(torch.load(f'trained_models/{model_name}.pth'))
+            try:
+                model.load_state_dict(torch.load(f'trained_models/{model_name}.pth'))
+            except FileNotFoundError as err:
+                try: 
+                    model.load_state_dict(torch.load(f'{model_name}.pth'))
+                except FileNotFoundError as err:
+                    print('No model with that name')
             model.to(device)
             if args[0] == 'test':
                 acc, f1, auc = test(model)
