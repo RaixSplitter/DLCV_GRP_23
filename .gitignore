@@ -161,3 +161,4 @@ cython_debug/
 
 02514/*
 Projects/Project1/trained_models/*
+GradCamResults/
