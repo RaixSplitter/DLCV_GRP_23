@@ -16,6 +16,7 @@ from sklearn.metrics import f1_score
 from data_utils import get_dataLoader
 from model.model_P import Network
 from model.resnet18 import resnet18
+from model.model_gradmod import Network_Grad_Mod
 
 #Setup Device
 if torch.cuda.is_available():
@@ -36,7 +37,7 @@ if not os.path.exists('trained_models'):
 log_path = f"logs/training_{current_time}.log"
 logging.basicConfig(filename=log_path, level=logging.INFO)
 
-model = Network()
+model = Network_Grad_Mod()
 #model = resnet18()
 model.to(device)
 
