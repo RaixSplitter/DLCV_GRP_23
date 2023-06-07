@@ -1,7 +1,8 @@
 import torch
+import os
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import transforms
+from torchvision import datasets, transforms
 import sys
 import numpy as np
 from PIL import Image
@@ -30,15 +31,23 @@ def infere(model, img):
 
 #not done because dataset returns a tensor and not the image, so the filename cannot be read... :(
 def check_problematic_images(model):
-    _, test_set, _, _ = get_dataLoader()
-
+    current_path = os.getcwd()
+    test_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'test')
+    
     incorrect_images = []
-    for data, target in test_set:
-        data = data.to(device)
-        with torch.no_grad():
-            output = model(data.unsqueeze(0))
-        predicted = output.argmax(1)
-        if target != predicted.cpu().item(): incorrect_images.append(img.filename)
+    for path, dirs, files in os.walk(test_path):
+        if files and not dirs:
+            target = 0 if 'hotdog' == path.split('/')[-1] else 1
+            for img_name in files:
+                img = Image.open(os.path.join(path,img_name))
+                data = basic_transform(img)
+                data = data.to(device)
+                model.eval()
+                with torch.no_grad():
+                    output = model(data.unsqueeze(0))
+                predicted = output.argmax(1)
+                if target != predicted.cpu().item():
+                    incorrect_images.append(f'{img_name} pred {predicted.cpu().item()}')
 
     return incorrect_images
 
@@ -66,7 +75,7 @@ def test(model):
         test_preds.extend(predicted.cpu().numpy())
         
     test_f1 = f1_score(test_labels, test_preds, average='macro')
-    test_acc = test_correct/len(test_set)
+    test_acc = test_correct/len(test_loader)
     test_auc = roc_auc_score(test_labels, np.array(test_outs)[:,1])
 
     return test_acc, test_f1, test_auc
