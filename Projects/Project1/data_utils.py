@@ -89,6 +89,14 @@ def plot_metrics(epochs, train_losses, test_losses, train_accuracies, test_accur
 if __name__ == "__main__":
 
     current_path = os.getcwd()
-    log_file = os.path.join(current_path, 'logs', 'resnet18_pretrained.log')
-    epochs, train_losses, test_losses, train_accuracies, test_accuracies = parse_log_file(log_file)
-    plot_metrics(epochs, train_losses, test_losses, train_accuracies, test_accuracies)
+    train_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'train')
+    transform = transforms.Compose([
+        transforms.Resize((224,224)), # resizing to same size, for example 224x224
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # normalization settings for RGB
+    ])
+    trainset = datasets.ImageFolder(train_path, transform=transform)
+    print(train_path)
+    # log_file = os.path.join(current_path, 'logs', 'resnet18_pretrained.log')
+    # epochs, train_losses, test_losses, train_accuracies, test_accuracies = parse_log_file(log_file)
+    # plot_metrics(epochs, train_losses, test_losses, train_accuracies, test_accuracies)
