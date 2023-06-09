@@ -1,12 +1,16 @@
 import torch
+import os
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import datasets, transforms
 import sys
 import numpy as np
 from PIL import Image
 from sklearn.metrics import f1_score, roc_auc_score
 from model.model_P import Network
-from data_utils import get_dataLoader
+from data_utils import get_dataLoader, basic_transform
+
+CLASSES = ['hotdog', 'nothotdog']
 
 #Setup Device
 if torch.cuda.is_available():
@@ -16,23 +20,34 @@ else:
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def infere(model, img):
-    img = img.to(device)
+    img_tensor = basic_transform(img)
+    img_tensor = img_tensor.to(device)
+    model.eval()
     with torch.no_grad():
-        out = model(img)
+        #unsqueeze makes a batch of one image
+        out = model(img_tensor.unsqueeze(0))
     prediction = out.argmax(1)
-    return prediction
+    return prediction.cpu().item()
 
+#not done because dataset returns a tensor and not the image, so the filename cannot be read... :(
 def check_problematic_images(model):
-    _, test_set, _, _ = get_dataLoader()
-
+    current_path = os.getcwd()
+    test_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'test')
+    
     incorrect_images = []
-    for img, target in test_set:
-        data = torch.tensor(np.array(img))
-        data, target = data.to(device), target.to(device)
-        with torch.no_grad():
-            output = model(data)
-        predicted = output.argmax(1)
-        if target != predicted: incorrect_images.append(img.filename)
+    for path, dirs, files in os.walk(test_path):
+        if files and not dirs:
+            target = 0 if 'hotdog' == path.split('/')[-1] else 1
+            for img_name in files:
+                img = Image.open(os.path.join(path,img_name))
+                data = basic_transform(img)
+                data = data.to(device)
+                model.eval()
+                with torch.no_grad():
+                    output = model(data.unsqueeze(0))
+                predicted = output.argmax(1)
+                if target != predicted.cpu().item():
+                    incorrect_images.append(f'{img_name} pred {predicted.cpu().item()}')
 
     return incorrect_images
 
@@ -47,34 +62,54 @@ def test(model):
     test_loss = []
     test_correct = 0
     test_labels, test_preds, test_outs = [], [], []
+    images = 0
     for data, target in test_loader:
+        images += len(data)
         data, target = data.to(device), target.to(device)
         with torch.no_grad():
             output = model(data)
         test_loss.append(loss_fun(output, target).cpu().item())
         predicted = output.argmax(1)
         soft_out = nn.Softmax(dim=1)(output)
-        test_outs.append(soft_out.cpu().numpy())
+        test_outs.extend(soft_out.cpu().numpy())
         test_correct += (target==predicted).sum().cpu().item()
         test_labels.extend(target.cpu().numpy())
         test_preds.extend(predicted.cpu().numpy())
         
     test_f1 = f1_score(test_labels, test_preds, average='macro')
-    test_acc = test_correct/len(test_loader)
-    test_auc = roc_auc_score(test_labels, test_outs)
+    test_acc = test_correct/images
+    test_auc = roc_auc_score(test_labels, np.array(test_outs)[:,1])
 
     return test_acc, test_f1, test_auc
 
 if __name__ == '__main__':
     args = sys.argv[1:] if len(sys.argv) > 1 else None
-    if len(args) == 1:
-        model_name = args[1]
-        model = Network().to(device).load_state_dict(f'trained_models/{model_name}.pth')
-        test(model)
+    if args is not None:
+        if len(args) == 2:
+            model_name = args[1]
+            model = Network()
+            try:
+                model.load_state_dict(torch.load(f'trained_models/{model_name}.pth'))
+            except FileNotFoundError as err:
+                try: 
+                    model.load_state_dict(torch.load(f'{model_name}.pth'))
+                except FileNotFoundError as err:
+                    print('No model with that name')
+            model.to(device)
+            if args[0] == 'test':
+                acc, f1, auc = test(model)
+                print(f'Model {model_name} scores: Accuracy: {acc}, F1: {f1}, ROC AUC: {auc}')
 
-    if len(args) == 2:
-        model_name, img_path = args
-        model = Network().to(device).load_state_dict(f'trained_models/{model_name}.pth')
-        img = Image.open(img_path)
-        img_tensor = torch.tensor(np.array(img))
-        print(infere(model, img))
+            elif args[0] == 'misspredictions':
+                incorrect_preds = check_problematic_images(model)
+                print(f'Model {model_name} incorrect predictions: {incorrect_preds}')
+
+        if len(args) == 3:
+            if args[0] == 'infere':
+                model_name, img_path = args[1:]
+                model = Network()
+                model.to(device)
+                model.load_state_dict(torch.load(f'trained_models/{model_name}.pth'))
+                img = Image.open(img_path)
+                pred = infere(model, img)
+                print(f'Predicted class: {pred} ({CLASSES[int(pred)]})')

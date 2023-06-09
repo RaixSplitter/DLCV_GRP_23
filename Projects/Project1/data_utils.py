@@ -4,6 +4,11 @@ import os
 import matplotlib.pyplot as plt
 import re
 
+basic_transform = transforms.Compose([
+        transforms.Resize((224,224)), # resizing to same size, for example 224x224
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]) # normalization settings for RGB
+
 def get_dataLoader(data_aug = False, batch_size = 64):
 
     current_path = os.getcwd()
@@ -20,11 +25,7 @@ def get_dataLoader(data_aug = False, batch_size = 64):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # normalization settings for RGB
     ])
     else: 
-        transform = transforms.Compose([
-        transforms.Resize((224,224)), # resizing to same size, for example 224x224
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # normalization settings for RGB
-    ])
+        transform = basic_transform
 
     trainset = datasets.ImageFolder(train_path, transform=transform)
     testset = datasets.ImageFolder(test_path, transform=transform)
@@ -35,27 +36,48 @@ def get_dataLoader(data_aug = False, batch_size = 64):
 
     return trainset, testset, train_loader, test_loader
 
-def parse_log_file(log_file):
-    with open(log_file, 'r') as f:
+
+# def parse_log_file(log_file):
+#     with open(log_file, 'r') as f:
+#         log_lines = f.readlines()
+
+#     epochs = []
+#     train_losses = []
+#     test_losses = []
+#     train_accuracies = []
+#     test_accuracies = []
+#     pattern = re.compile(r'Epoch: (\d+), Loss train: ([\d\.]+), Loss test: ([\d\.]+), Accuracy train: ([\d\.]+)%, Accuracy test: ([\d\.]+)%')
+
+#     for line in log_lines:
+#         match = pattern.search(line)
+#         if match:
+#             epochs.append(int(match.group(1)))
+#             train_losses.append(float(match.group(2)))
+#             test_losses.append(float(match.group(3)))
+#             train_accuracies.append(float(match.group(4)))
+#             test_accuracies.append(float(match.group(5)))
+
+#     return epochs, train_losses, test_losses, train_accuracies, test_accuracies
+
+def parse_logfile(filepath):
+    with open(filepath, 'r') as f:
         log_lines = f.readlines()
 
+    # Regex pattern for extracting information
+    pattern = r'Epoch: (\d+), Loss train: ([\d.]+), Loss test: ([\d.]+), Accuracy train: ([\d.]+)%, Accuracy test: ([\d.]+)%'
+
     epochs = []
-    train_losses = []
     test_losses = []
-    train_accuracies = []
     test_accuracies = []
-    pattern = re.compile(r'Epoch: (\d+), Loss train: ([\d\.]+), Loss test: ([\d\.]+), Accuracy train: ([\d\.]+)%, Accuracy test: ([\d\.]+)%')
 
     for line in log_lines:
-        match = pattern.search(line)
+        match = re.search(pattern, line)
         if match:
             epochs.append(int(match.group(1)))
-            train_losses.append(float(match.group(2)))
             test_losses.append(float(match.group(3)))
-            train_accuracies.append(float(match.group(4)))
             test_accuracies.append(float(match.group(5)))
 
-    return epochs, train_losses, test_losses, train_accuracies, test_accuracies
+    return epochs, test_losses, test_accuracies
 
 def plot_metrics(epochs, train_losses, test_losses, train_accuracies, test_accuracies):
     # Plot loss
@@ -83,12 +105,34 @@ def plot_metrics(epochs, train_losses, test_losses, train_accuracies, test_accur
     plt.close() # Close figure
 
 
-
-
-
 if __name__ == "__main__":
 
-    current_path = os.getcwd()
-    log_file = os.path.join(current_path, 'logs', 'resnet18_pretrained.log')
-    epochs, train_losses, test_losses, train_accuracies, test_accuracies = parse_log_file(log_file)
-    plot_metrics(epochs, train_losses, test_losses, train_accuracies, test_accuracies)
+    # current_path = os.getcwd()
+    # log_file = os.path.join(current_path, 'logs', 'resnet18_pretrained.log')
+    # epochs, train_losses, test_losses, train_accuracies, test_accuracies = parse_log_file(log_file)
+    # plot_metrics(epochs, train_losses, test_losses, train_accuracies, test_accuracies)
+
+    # Parse log files
+    epochs_adam, test_losses_adam, test_accuracies_adam = parse_logfile('logs/our_model_adam.log')
+    epochs_sgd, test_losses_sgd, test_accuracies_sgd = parse_logfile('logs/our_model_SGD.log')
+
+    # Create subplots
+    fig, axs = plt.subplots(2)
+
+    # Plot test losses
+    axs[0].plot(epochs_adam, test_losses_adam, label='Adam')
+    axs[0].plot(epochs_sgd, test_losses_sgd, label='SGD')
+    axs[0].set_xlabel('Epoch')
+    axs[0].set_ylabel('Test Loss')
+    axs[0].legend()
+
+    # Plot test accuracies
+    axs[1].plot(epochs_adam, test_accuracies_adam, label='Adam')
+    axs[1].plot(epochs_sgd, test_accuracies_sgd, label='SGD')
+    axs[1].set_xlabel('Epoch')
+    axs[1].set_ylabel('Test Accuracy (%)')
+    axs[1].legend()
+
+    plt.tight_layout()
+    plt.savefig('plots/Optimizer_compare.png') # Save figure
+    plt.close() # Close figure
