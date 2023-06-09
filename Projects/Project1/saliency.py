@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-with open('heatmap.pkl', 'rb') as f:
+with open('./GradCamResults/heatmap.pkl', 'rb') as f:
     heatmap = pickle.load(f)
 
 heatmap = heatmap.numpy()
