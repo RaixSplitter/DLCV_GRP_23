@@ -12,8 +12,10 @@ basic_transform = transforms.Compose([
 def get_dataLoader(data_aug = False, batch_size = 64):
 
     current_path = os.getcwd()
-    train_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'train')
-    test_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'test')
+    # train_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'train')
+    # test_path = os.path.join(current_path, '..', '..', '02514', 'hotdog_nothotdog', 'test')
+    train_path = '/dtu/datasets1/02514/hotdog_nothotdog/train'
+    test_path = '/dtu/datasets1/02514/hotdog_nothotdog/test'
     
     if data_aug == True:
         transform = transforms.Compose([
