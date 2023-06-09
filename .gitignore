@@ -161,7 +161,8 @@ cython_debug/
 
 02514/*
 Projects/Project1/trained_models/*
-GradCamResults/*
+Projects/Project1/GradCamResults/*
 Projects/Project2/data/*
+Projects/Project2/results/*
 venv_1
 run.txt
