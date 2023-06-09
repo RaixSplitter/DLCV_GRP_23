@@ -161,4 +161,8 @@ cython_debug/
 
 02514/*
 Projects/Project1/trained_models/*
+<<<<<<< Updated upstream
 GradCamResults/
+=======
+Projects/Project2/data/*
+>>>>>>> Stashed changes
