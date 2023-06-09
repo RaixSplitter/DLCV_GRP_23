@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 
 class DRIVEDataset(Dataset):
+<<<<<<< Updated upstream
     def __init__(self, img_dir, mask_dir, eye_mask_dir, transform=None):
         self.img_dir = img_dir
         self.mask_dir = mask_dir
@@ -19,11 +20,22 @@ class DRIVEDataset(Dataset):
 
     def __len__(self):
         # Assume that the number of images, masks, and eye masks are the same
+=======
+    def __init__(self, img_dir, mask_dir, transform=None):
+        self.img_dir = img_dir
+        self.mask_dir = mask_dir
+        self.transform = transform
+        self.images = sorted(os.listdir(img_dir))  # Sort the filenames
+        self.masks = sorted(os.listdir(mask_dir))  # Sort the filenames
+
+    def __len__(self):
+>>>>>>> Stashed changes
         return len(self.images)
 
     def __getitem__(self, idx):
         img_name = self.images[idx]
         mask_name = self.masks[idx]
+<<<<<<< Updated upstream
         #eye_mask_name = self.eye_masks[idx]
         img_path = os.path.join(self.img_dir, img_name)
         mask_path = os.path.join(self.mask_dir, mask_name)
@@ -32,10 +44,18 @@ class DRIVEDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
         mask = Image.open(mask_path)
         #eye_mask = Image.open(eye_mask_path)
+=======
+        img_path = os.path.join(self.img_dir, img_name)
+        mask_path = os.path.join(self.mask_dir, mask_name)
+
+        image = Image.open(img_path).convert("RGB")
+        mask = Image.open(mask_path)
+>>>>>>> Stashed changes
 
         if self.transform:
             image = self.transform(image)
             mask = self.transform(mask)
+<<<<<<< Updated upstream
             #eye_mask = self.transform(eye_mask)
 
         return image, mask, eye_mask
@@ -61,10 +81,31 @@ def visualize(dataset, idx, save_dir):
     
     for a in ax:
         a.axis('off')  # Turn off axis
+=======
+
+        return image, mask
+
+
+def visualize(dataset, idx, save_dir):
+    image, mask, eye_mask = dataset[idx] 
+    image = image.permute(1, 2, 0) 
+    
+    fig, ax = plt.subplots(1, 2, figsize=(15,5))
+
+    ax[0].imshow(image)
+    ax[0].set_title('Image')
+
+    ax[1].imshow(mask.squeeze(), cmap='gray')
+    ax[1].set_title('Mask')
+    
+    for a in ax:
+        a.axis('off')
+>>>>>>> Stashed changes
 
     plt.savefig(os.path.join(save_dir, f'data_{idx}.png'))  # Save the figure
 
 
+<<<<<<< Updated upstream
 current_path = os.getcwd()
 image_path = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', 'images')
 vessel_mask = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', '1st_manual')
@@ -90,3 +131,26 @@ print('Loaded %d val images' % len(val_dataset))
 print('Loaded %d test images' % len(test_dataset))
 
 visualize(train_dataset, 1, plot_path)
+=======
+def get_data_loader(image_path, vessel_mask, size):
+
+    tsfm = transforms.Compose([
+        transforms.Resize((size, size)),
+        transforms.ToTensor(),
+    ])
+
+    dataset = DRIVEDataset(image_path, vessel_mask, transform=tsfm)
+
+    train_size = int(0.7 * len(dataset))  # 70% of dataset for training
+    val_size = int(0.15 * len(dataset))  # 15% of dataset for validation
+    test_size = len(dataset) - train_size - val_size  # remaining for testing
+
+    train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
+
+    # Create dataloaders for each dataset
+    train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=4, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=4, shuffle=False)
+
+    return train_dataset, val_dataset, test_dataset, train_dataloader, val_dataloader, test_dataloader
+>>>>>>> Stashed changes
