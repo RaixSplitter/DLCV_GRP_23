@@ -6,10 +6,10 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from PIL import Image
 
 class ph2_dataset(Dataset):
-    def __init__(self, transform = None):
-        self.path = os.path.join(os.getcwd(),'data','PH2_Dataset_images')
+    def __init__(self, transform = None, img_size = 400):
+        self.path = os.path.join(os.getcwd(), '..','data','PH2_Dataset_images')
         self.transform = transform if transform is not None else transforms.Compose([
-            transforms.Resize((400,400)),
+            transforms.Resize((img_size,img_size)),
             transforms.ToTensor()
             ])
         self.items = os.listdir(self.path)
@@ -26,15 +26,15 @@ class ph2_dataset(Dataset):
         Y = self.transform(label)
         return X, Y
     
-def get_dataloaders():
-    data = ph2_dataset()
+def get_dataloaders(img_size=400):
+    data = ph2_dataset(img_size=img_size)
     train_size = int(0.75*len(data))
     test_size = int(0.15*len(data))
     val_size = len(data) - train_size - test_size
 
     train, test, val = random_split(data, [train_size, test_size, val_size])
-    train_dl = DataLoader(train, batch_size=32, shuffle=True)
-    test_dl = DataLoader(test, batch_size=32, shuffle=False)
-    val_dl = DataLoader(val, batch_size=32, shuffle=False)
+    train_dl = DataLoader(train, batch_size=16, shuffle=True)
+    test_dl = DataLoader(test, batch_size=16, shuffle=False)
+    val_dl = DataLoader(val, batch_size=16, shuffle=False)
     
     return train_dl, test_dl, val_dl

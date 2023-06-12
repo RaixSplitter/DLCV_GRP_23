@@ -162,17 +162,23 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
         Y_hat = torch.sigmoid(model(X_test.to(device))).detach().cpu()
         clear_output(wait=True)
         for k in range(2):  # change this to change the number of images shown
-            plt.subplot(2, 2, k+1)
+            plt.subplot(2, 3, 3*k+1)
             plt.imshow(np.transpose(X_test[k].numpy(), (1, 2, 0)), cmap='gray')
             plt.title('Real')
             plt.axis('off')
 
-            plt.subplot(2, 2, k+3)
+            plt.subplot(2, 3, 3*k+2)
             plt.imshow(Y_hat[k, 0], cmap='gray')
             plt.title('Output')
             plt.axis('off')
-        
-        plt.suptitle('result')
+            
+            plt.subplot(2, 3, 3*k+3)
+            plt.imshow(Y_test[k, 0], cmap='gray')
+            plt.title('Target')
+            plt.axis('off')
+
+        plt.suptitle('Result')
         plt.savefig(os.path.join(save_dir, f"epoch_{epoch+1}_results.png"))  # Save the figure
         plt.clf()  # Clear the current figure for the next plot
+
 
