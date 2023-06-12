@@ -77,11 +77,15 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
     log_path = f"../logs/training_{current_time}.log"
     logging.basicConfig(filename=log_path, level=logging.INFO)
 
+    scheduler = StepLR(opt, step_size=25, gamma=0.1)  # Define the scheduler with appropriate parameters
+
     for epoch in range(epochs):
         print('* Epoch %d/%d' % (epoch+1, epochs))
 
         avg_loss = 0
-        avg_dice, avg_iou, avg_acc, avg_sens, avg_spec = 0, 0, 0, 0, 0
+        avg_dice_train, avg_iou_train, avg_acc_train, avg_sens_train, avg_spec_train = 0, 0, 0, 0, 0
+        avg_dice_test, avg_iou_test, avg_acc_test, avg_sens_test, avg_spec_test = 0, 0, 0, 0, 0
+        
         model.train()  # train mode
         for X_batch, Y_batch in train_loader:
             X_batch = X_batch.to(device)
@@ -96,36 +100,62 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
             loss.backward()  # backward-pass
             opt.step()  # update weights
 
-            # calculate metrics to show the user
+            # calculate metrics for training set
             avg_loss += loss / len(train_loader)
-
-            # binary predictions
             Y_pred_bin = (Y_pred > 0.5).type(torch.int)
-
-            # compute metrics
             intersection = torch.logical_and(Y_batch, Y_pred_bin)
             union = torch.logical_or(Y_batch, Y_pred_bin)
             iou_score = torch.sum(intersection) / torch.sum(union)
-
             dice_score = 2. * torch.sum(intersection) / (torch.sum(Y_batch) + torch.sum(Y_pred_bin))
-
             tn = ((Y_pred_bin == 0) & (Y_batch == 0)).sum()
             tp = ((Y_pred_bin == 1) & (Y_batch == 1)).sum()
             fn = ((Y_pred_bin == 0) & (Y_batch == 1)).sum()
             fp = ((Y_pred_bin == 1) & (Y_batch == 0)).sum()
-
             accuracy = (tp + tn) / (tp + tn + fp + fn)
             sensitivity = tp / (tp + fn)
             specificity = tn / (tn + fp)
+            avg_dice_train += dice_score / len(train_loader)
+            avg_iou_train += iou_score / len(train_loader)
+            avg_acc_train += accuracy / len(train_loader)
+            avg_sens_train += sensitivity / len(train_loader)
+            avg_spec_train += specificity / len(train_loader)
 
-            avg_dice += dice_score / len(train_loader)
-            avg_iou += iou_score / len(train_loader)
-            avg_acc += accuracy / len(train_loader)
-            avg_sens += sensitivity / len(train_loader)
-            avg_spec += specificity / len(train_loader)
+        # calculate metrics for test set
+        model.eval()  # testing mode
+        with torch.no_grad():
+            test_loss = 0
+            for X_batch, Y_batch in test_loader:
+                X_batch = X_batch.to(device)
+                Y_batch = Y_batch.to(device)
 
-        print(' - loss: %f, Dice: %f, IoU: %f, Acc: %f, Sens: %f, Spec: %f' % (avg_loss, avg_dice, avg_iou, avg_acc, avg_sens, avg_spec))
-        logging.info(f"Epoch: {epoch}, Loss: {avg_loss}, Dice: {avg_dice}, IoU: {avg_iou}, Acc: {avg_acc}, Sens: {avg_sens}, Spec: {avg_spec}")
+                Y_pred = model(X_batch)
+                loss = loss_fn(Y_batch, Y_pred)  # forward-pass
+                test_loss += loss.item() / len(test_loader)
+                Y_pred_bin = (Y_pred > 0.5).type(torch.int)
+                intersection = torch.logical_and(Y_batch, Y_pred_bin)
+                union = torch.logical_or(Y_batch, Y_pred_bin)
+                iou_score = torch.sum(intersection) / torch.sum(union)
+                dice_score = 2. * torch.sum(intersection) / (torch.sum(Y_batch) + torch.sum(Y_pred_bin))
+                tn = ((Y_pred_bin == 0) & (Y_batch == 0)).sum()
+                tp = ((Y_pred_bin == 1) & (Y_batch == 1)).sum()
+                fn = ((Y_pred_bin == 0) & (Y_batch == 1)).sum()
+                fp = ((Y_pred_bin == 1) & (Y_batch == 0)).sum()
+                accuracy = (tp + tn) / (tp + tn + fp + fn)
+                sensitivity = tp / (tp + fn)
+                specificity = tn / (tn + fp)
+                avg_dice_test += dice_score / len(test_loader)
+                avg_iou_test += iou_score / len(test_loader)
+                avg_acc_test += accuracy / len(test_loader)
+                avg_sens_test += sensitivity / len(test_loader)
+                avg_spec_test += specificity / len(test_loader)
+
+        print(' - Train Loss: %.4f, Dice: %.2f, IoU: %.2f, Acc: %.2f, Sens: %.2f, Spec: %.2f' % (avg_loss, avg_dice_train, avg_iou_train, avg_acc_train, avg_sens_train, avg_spec_train))
+        print(' - Test Loss: %.4f, Dice: %.2f, IoU: %.2f, Acc: %.2f, Sens: %.2f, Spec: %.2f' % (test_loss, avg_dice_test, avg_iou_test, avg_acc_test, avg_sens_test, avg_spec_test))
+
+        logging.info(f"Epoch: {epoch}, Train Loss: {avg_loss:.4f}, Dice: {avg_dice_train:.2f}, IoU: {avg_iou_train:.2f}, Acc: {avg_acc_train:.2f}, Sens: {avg_sens_train:.2f}, Spec: {avg_spec_train:.2f}")
+        logging.info(f"Epoch: {epoch}, Test Loss: {test_loss:.4f}, Dice: {avg_dice_test:.2f}, IoU: {avg_iou_test:.2f}, Acc: {avg_acc_test:.2f}, Sens: {avg_sens_test:.2f}, Spec: {avg_spec_test:.2f}")
+        
+        scheduler.step()
 
         # show intermediate results
         model.eval()  # testing mode
@@ -145,3 +175,4 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
         plt.suptitle('result')
         plt.savefig(os.path.join(save_dir, f"epoch_{epoch+1}_results.png"))  # Save the figure
         plt.clf()  # Clear the current figure for the next plot
+
