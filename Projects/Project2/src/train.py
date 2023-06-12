@@ -15,6 +15,9 @@ import torch.optim as optim
 from time import time
 import sys
 import os
+from torch.optim.lr_scheduler import StepLR
+import logging
+import datetime
 
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
@@ -57,7 +60,7 @@ def train(model, opt, loss_fn, epochs, train_loader, test_loader, save_dir, devi
             plt.axis('off')
 
             plt.subplot(2, 2, k+3)
-            plt.imshow(Y_hat[k, 0], cmap='gray')
+            plt.imshow(Y_hat[k, 0], cmap='RGB')
             plt.title('Output')
             plt.axis('off')
         
@@ -65,9 +68,14 @@ def train(model, opt, loss_fn, epochs, train_loader, test_loader, save_dir, devi
         plt.savefig(os.path.join(save_dir, f"epoch_{epoch+1}_results.png"))  # Save the figure
         plt.clf()  # Clear the current figure for the next plot
 
+
 def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, save_dir, device):
     os.makedirs(save_dir, exist_ok=True)
     X_test, Y_test = next(iter(test_loader))
+
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_path = f"../logs/training_{current_time}.log"
+    logging.basicConfig(filename=log_path, level=logging.INFO)
 
     for epoch in range(epochs):
         print('* Epoch %d/%d' % (epoch+1, epochs))
@@ -117,6 +125,7 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
             avg_spec += specificity / len(train_loader)
 
         print(' - loss: %f, Dice: %f, IoU: %f, Acc: %f, Sens: %f, Spec: %f' % (avg_loss, avg_dice, avg_iou, avg_acc, avg_sens, avg_spec))
+        logging.info(f"Epoch: {epoch}, Loss: {avg_loss}, Dice: {avg_dice}, IoU: {avg_iou}, Acc: {avg_acc}, Sens: {avg_sens}, Spec: {avg_spec}")
 
         # show intermediate results
         model.eval()  # testing mode
