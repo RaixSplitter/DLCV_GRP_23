@@ -164,5 +164,11 @@ Projects/Project1/trained_models/*
 Projects/Project1/GradCamResults/*
 Projects/Project2/data/*
 Projects/Project2/results/*
-venv_1
-run.txt
+Projects/Project2/log/test.txt
+Projects/Project2/model/test.txt
+Projects/Project2/plots/test.txt
+Projects/Project2/src/data_utils.py
+Projects/Project2/src/loss.py
+Projects/Project2/src/main.py
+Projects/Project2/src/ph2_dataloader.py
+Projects/Project2/src/train.py
