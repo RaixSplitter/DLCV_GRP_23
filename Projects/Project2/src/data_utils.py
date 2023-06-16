@@ -62,14 +62,15 @@ def get_data_loader(image_path, vessel_mask, size):
     dataset = DRIVEDataset(image_path, vessel_mask, transform=tsfm)
 
     train_size = int(0.7 * len(dataset))  # 70% of dataset for training
-    val_size = int(0.15 * len(dataset))  # 15% of dataset for validation
+    # val_size = int(0.15 * len(dataset))  # 15% of dataset for validation
+    val_size = int(0.3 * len(dataset))  # 30% of dataset for validation
     test_size = len(dataset) - train_size - val_size  # remaining for testing
 
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
-
+    # raise Exception(len(train_dataset), len(val_dataset), len(test_dataset))
     # Create dataloaders for each dataset
     train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=4, shuffle=False)
     test_dataloader = DataLoader(test_dataset, batch_size=4, shuffle=False)
-
+    
     return train_dataset, val_dataset, test_dataset, train_dataloader, val_dataloader, test_dataloader

@@ -74,7 +74,8 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
     X_test, Y_test = next(iter(test_loader))
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_path = f"../logs/training_{current_time}.log"
+    # log_path = f"../logs/training_{current_time}.log"
+    log_path = f"Projects/Project2/log/training_{current_time}.log"
     logging.basicConfig(filename=log_path, level=logging.INFO)
 
     scheduler = StepLR(opt, step_size=25, gamma=0.1)  # Define the scheduler with appropriate parameters
@@ -84,7 +85,7 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
 
         avg_loss = 0
         avg_dice_train, avg_iou_train, avg_acc_train, avg_sens_train, avg_spec_train = 0, 0, 0, 0, 0
-        avg_dice_test, avg_iou_test, avg_acc_test, avg_sens_test, avg_spec_test = 0, 0, 0, 0, 0
+        avg_dice_test,  avg_iou_test,  avg_acc_test,  avg_sens_test,  avg_spec_test  = 0, 0, 0, 0, 0
         
         model.train()  # train mode
         for X_batch, Y_batch in train_loader:
@@ -130,6 +131,7 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
 
                 Y_pred = model(X_batch)
                 loss = loss_fn(Y_batch, Y_pred)  # forward-pass
+                # calculate metrics for testing set
                 test_loss += loss.item() / len(test_loader)
                 Y_pred_bin = (Y_pred > 0.5).type(torch.int)
                 intersection = torch.logical_and(Y_batch, Y_pred_bin)
@@ -149,8 +151,8 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
                 avg_sens_test += sensitivity / len(test_loader)
                 avg_spec_test += specificity / len(test_loader)
 
-        print(' - Train Loss: %.4f, Dice: %.2f, IoU: %.2f, Acc: %.2f, Sens: %.2f, Spec: %.2f' % (avg_loss, avg_dice_train, avg_iou_train, avg_acc_train, avg_sens_train, avg_spec_train))
-        print(' - Test Loss: %.4f, Dice: %.2f, IoU: %.2f, Acc: %.2f, Sens: %.2f, Spec: %.2f' % (test_loss, avg_dice_test, avg_iou_test, avg_acc_test, avg_sens_test, avg_spec_test))
+        print(' - Train Loss: %.4f, Dice: %.2f, IoU: %.2f, Acc: %.2f, Sens: %.2f, Spec: %.2f' % ( avg_loss, avg_dice_train, avg_iou_train, avg_acc_train, avg_sens_train, avg_spec_train))
+        print(' -  Test Loss: %.4f, Dice: %.2f, IoU: %.2f, Acc: %.2f, Sens: %.2f, Spec: %.2f' % (test_loss, avg_dice_test,  avg_iou_test,  avg_acc_test,  avg_sens_test,  avg_spec_test ))
 
         logging.info(f"Epoch: {epoch}, Train Loss: {avg_loss:.4f}, Dice: {avg_dice_train:.2f}, IoU: {avg_iou_train:.2f}, Acc: {avg_acc_train:.2f}, Sens: {avg_sens_train:.2f}, Spec: {avg_spec_train:.2f}")
         logging.info(f"Epoch: {epoch}, Test Loss: {test_loss:.4f}, Dice: {avg_dice_test:.2f}, IoU: {avg_iou_test:.2f}, Acc: {avg_acc_test:.2f}, Sens: {avg_sens_test:.2f}, Spec: {avg_spec_test:.2f}")
@@ -161,7 +163,7 @@ def train_with_metrics(model, opt, loss_fn, epochs, train_loader, test_loader, s
         model.eval()  # testing mode
         Y_hat = torch.sigmoid(model(X_test.to(device))).detach().cpu()
         clear_output(wait=True)
-        for k in range(2):  # change this to change the number of images shown
+        for k in range(5):  # change this to change the number of images shown
             plt.subplot(2, 3, 3*k+1)
             plt.imshow(np.transpose(X_test[k].numpy(), (1, 2, 0)), cmap='gray')
             plt.title('Real')

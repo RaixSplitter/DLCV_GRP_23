@@ -82,3 +82,8 @@ class UNet(nn.Module):
         d3 = self.dec_conv3(d3)  # no activation
 
         return d3
+
+from torchsummary import summary
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = UNet().to(device)
+summary(model, (3, 128, 128))

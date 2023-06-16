@@ -29,6 +29,9 @@ import ph2_dataloader
 def bce_loss(y_real, y_pred):
     return torch.mean(y_pred - y_real*y_pred + torch.log(1 + torch.exp(-y_pred)))
 
+def s_loss(y_real, y_pred):
+    return torch.mean(y_pred - y_real*y_pred + torch.log(1 + torch.exp(-y_pred)))
+
 if __name__ == "__main__":
     dataset = sys.argv[1] if len(sys.argv) > 1 else 'drive'
     current_path = os.getcwd()
@@ -36,9 +39,12 @@ if __name__ == "__main__":
     results_path = os.path.join(current_path, '..', 'results')
     if dataset == 'drive':
         #Paths
-        image_path = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', 'images')
-        vessel_mask = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', '1st_manual')
-        eye_mask = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', 'mask')
+        # image_path  = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', 'images')
+        # vessel_mask = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', '1st_manual')
+        # eye_mask    = os.path.join(current_path, '..', 'data', 'DRIVE', 'training', 'mask')
+        image_path  = "/dtu/datasets1/02514/DRIVE/training/images"
+        vessel_mask = "/dtu/datasets1/02514/DRIVE/training/1st_manual"
+        eye_mask    = "/dtu/datasets1/02514/DRIVE/training/mask"
 
         size = 128 # Image size 
         train_dataset, val_dataset, test_dataset, train_dataloader, val_dataloader, test_dataloader = get_data_loader(image_path, vessel_mask, size)
@@ -47,8 +53,9 @@ if __name__ == "__main__":
     else:
         print('that\'s not a dataset!')
     learning_rate = 0.001
-    epochs = 50
-
+    epochs = 10
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = EncDec(image_size=size).to(device)
-    train_with_metrics(model, optim.AdamW(model.parameters(), lr=learning_rate), bce_loss, epochs, train_dataloader, val_dataloader, results_path, device)
+    # model = EncDec(image_size=size).to(device)
+    from model.unet_s import UNeet
+    model = UNeet(3).to(device)
+    train_with_metrics(model, optim.AdamW(model.parameters(), lr=learning_rate), s_loss, epochs, train_dataloader, val_dataloader, results_path, device)

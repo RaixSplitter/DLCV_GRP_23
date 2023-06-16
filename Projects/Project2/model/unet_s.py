@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class UNet(nn.Module):
+class UNeet(nn.Module):
     def __init__(self, in_ch = 3):
         super().__init__()
 

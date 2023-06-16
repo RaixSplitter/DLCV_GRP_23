@@ -1,0 +1,4 @@
+How To Run:
+02514sh
+source .venv/bin/activate
+python Projects/Project1/hotdog_classifier.py
