@@ -8,11 +8,12 @@ from PIL import Image
 
 DATA_PATH = "/dtu/datasets1/02514/data_wastedetection"
 
-class WasteDataset(Dataset):
-    def __init__(self, transform=None):
+class WasteDatasetPatches(Dataset):
+    def __init__(self, transform=None, resolution=(64,64)):
         with open(os.path.join(DATA_PATH,'annotations.json')) as f:
             data = json.load(f)
         self.transform = transform if transform is not None else transforms.Compose([
+            transforms.Resize(resolution),
             transforms.ToTensor()
             ])
         self.img_info = data['images']
@@ -23,8 +24,13 @@ class WasteDataset(Dataset):
     
     def __getitem__(self, idx):
         item = self.annotation[idx]
-        src_img_file = self.img_info[item['image_id']]['file_name']
-        src_img = Image.open(os.path.join(DATA_PATH,src_img_file))
+        #assert idx+1 == item['id']
+
+        src_img_data = self.img_info[item['image_id']]
+        assert src_img_data['id'] == item['image_id']
+
+        src_img = Image.open(os.path.join(DATA_PATH,src_img_data['file_name']))
+        src_img.save('original_img.png')
 
         label = item['category_id']
         bbox = item['bbox']
