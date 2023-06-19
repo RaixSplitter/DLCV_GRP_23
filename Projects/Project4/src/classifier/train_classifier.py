@@ -16,7 +16,7 @@ from sklearn.metrics import f1_score
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 from waste_dataset import WasteDatasetPatches
-from simpleCNN import SimpleClassifier
+
 
 #Setup Device
 if torch.cuda.is_available():
@@ -95,6 +95,7 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl, train_
     return out_dict
 
 if __name__ == '__main__':
+    from simpleCNN import SimpleClassifier
     patch_size = (64,64)
     data = WasteDatasetPatches(resolution=patch_size)
     train_size = int(0.75*len(data))
