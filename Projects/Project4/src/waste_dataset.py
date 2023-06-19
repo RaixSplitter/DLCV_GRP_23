@@ -7,6 +7,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from PIL import Image
 
 DATA_PATH = "/dtu/datasets1/02514/data_wastedetection"
+SUPERCATEGORIES = {"Aluminium foil":0, "Battery":1, "Blister pack":2, "Bottle":3, "Bottle cap":4, "Broken glass":5, "Can":6, "Carton":7, "Cup":8, "Food waste":9, "Glass jar":10, "Lid":11, "Other plastic":12, "Paper":13, "Paper bag":14, "Plastic bag & wrapper":15, "Plastic container":16, "Plastic glooves":17, "Plastic utensils":18, "Pop tab":19, "Rope & strings":20, "Scrap metal":21, "Shoe":22, "Squeezable tube":23, "Straw":24, "Styrofoam piece":25, "Unlabeled litter":26, "Cigarette":27}
+CATEGORY_RANGE = [0,1,3,6,8,9,12,19,24,25,26,28,29,33,35,42,47,48,49,50,51,52,53,54,56,57,58,59]
 
 class WasteDatasetPatches(Dataset):
     def __init__(self, transform=None, resolution=(64,64)):
@@ -63,10 +65,12 @@ class WasteDatasetImages(Dataset):
         resized_img = src_img.resize(self.resize)
         transformed_img = self.transform(resized_img)
         
-        bboxes = [ann['bbox'] for ann in self.annotation if ann['image_id'] == img_id]
+        patches = [ann for ann in self.annotation if ann['image_id'] == img_id]
         #print(f"Found {len(bboxes)} bounding boxes for image {img_id}")
         resized_bboxes = []
-        for bbox in bboxes:
+        labels = []
+        for patch in patches:
+            bbox = patch['bbox']
             resized_bbox = [
                 bbox[0] * self.resize[0] / src_img.width,  # x
                 bbox[1] * self.resize[1] / src_img.height,  # y
@@ -74,6 +78,9 @@ class WasteDatasetImages(Dataset):
                 bbox[3] * self.resize[1] / src_img.height  # height
             ]
             resized_bboxes.append(resized_bbox)
+            subclass = patch['category_id']
+            label = next((idx for idx, x in enumerate(CATEGORY_RANGE) if subclass<=x), None)
+            labels.append(label)
 
-        return transformed_img, resized_bboxes
+        return transformed_img, resized_bboxes, labels
 
