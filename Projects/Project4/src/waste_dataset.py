@@ -33,7 +33,6 @@ class WasteDatasetPatches(Dataset):
         assert src_img_data['id'] == item['image_id']
 
         src_img = Image.open(os.path.join(DATA_PATH,src_img_data['file_name']))
-        src_img.save('original_img.png')
 
         supercat = self.categories[item['category_id']]['supercategory']
         #if we're not using the class (not in supercategories list), set to unlabeled
@@ -43,6 +42,12 @@ class WasteDatasetPatches(Dataset):
         subimage = src_img.crop(bounding_box)
 
         return self.transform(subimage), label
+    
+    def num_categories(self):
+        return len(SUPERCATEGORIES)
+    
+    def category_name(self, label):
+        return SUPERCATEGORIES[label]
 
 class WasteDatasetImages(Dataset):
     def __init__(self, transform=None, resize=(224,224)):
@@ -91,4 +96,7 @@ class WasteDatasetImages(Dataset):
     
     def num_categories(self):
         return len(SUPERCATEGORIES)
+    
+    def category_name(self, label):
+        return SUPERCATEGORIES[label]
 
