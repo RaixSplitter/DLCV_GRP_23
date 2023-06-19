@@ -40,7 +40,7 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl, train_
         train_loss = []
         train_labels, train_preds = [], []  # Collect true and predicted labels
         for idx, (data, target) in enumerate(train_dl):
-            print(f'Start batch {idx}/{len(train_dl)}')
+            print(f'Start batch {idx}/{len(train_dl)} with {len(data)}')
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
