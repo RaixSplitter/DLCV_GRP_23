@@ -1,5 +1,6 @@
-from sklearn.metrics import confusion_matrix, precision_score, recall_score
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, precision_recall_curve, PrecisionRecallDisplay
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 def calculate_iou(bbox1 : list[float], bbox2 : list[float]):
     # bbox : [x, y, w, h]    
@@ -25,6 +26,10 @@ def calculate_iou(bbox1 : list[float], bbox2 : list[float]):
     iou = za / ua
 
     return float(iou)
+
+def get_pred_from_confidence(confidence : list[float], threshold : float = 0.5):
+    y_pred = [True if score >= threshold else False for score in confidence]
+    return y_pred
 
 def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4):
 
@@ -54,7 +59,7 @@ def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4):
     return bbox_list_new
 
 def mean_average_precision(y_true : list[bool], confidence : list[float], threshold : float = 0.5):
-    y_pred = [True if score >= threshold else False for score in confidence]
+    y_pred = get_pred_from_confidence(confidence, threshold)
 
     precision_scores = []
     recall_scores = []
@@ -81,7 +86,32 @@ def mean_average_precision(y_true : list[bool], confidence : list[float], thresh
 
     return average_precision, precision_scores, recall_scores
 
+def sklearn_map(y_true : list[bool], confidence : list[float], threshold : float = 0.5):
+    y_pred = get_pred_from_confidence(confidence, threshold)
 
-    
+    precision, recall, _ = precision_recall_curve(y_true, y_pred)
+    disp = PrecisionRecallDisplay(precision=precision, recall=recall)
+    disp.plot()
+    plt.show()
+    plt.savefig("SKprecision_recall_curve.png")    
+
+def get_confusion_matrix(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot : bool = False):
+    y_pred = get_pred_from_confidence(confidence, threshold)
+
+    #cm
+    cm = confusion_matrix(y_true, y_pred)
+
+
+    if not plot:
+        return cm
+    #seaborn heatmap
+    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues')
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix")
+    plt.show()
+    plt.savefig("confusion_matrix.png")
+
+    return cm
 
 
