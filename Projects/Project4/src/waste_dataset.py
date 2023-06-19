@@ -40,15 +40,16 @@ class WasteDatasetPatches(Dataset):
         return self.transform(subimage), label
 
 class WasteDatasetImages(Dataset):
-    def __init__(self, transform=None, resize=None):
+    def __init__(self, transform=None, img_size=512):
         with open(os.path.join(DATA_PATH, 'annotations.json')) as f:
             data = json.load(f)
         self.transform = transform if transform is not None else transforms.Compose([
+            transforms.Resize((img_size,img_size)),
             transforms.ToTensor()
-        ])
+            ])
         self.img_info = data['images']
         self.annotation = data['annotations']
-        self.resize = resize  # Specify the desired resize dimensions
+        self.img_size = img_size
     
     def __len__(self):
         return len(self.img_info)
@@ -59,21 +60,15 @@ class WasteDatasetImages(Dataset):
         src_img_file = img_info['file_name']
         src_img = Image.open(os.path.join(DATA_PATH, src_img_file))
         
-        # Resize the image
-        resized_img = src_img.resize(self.resize)
-        transformed_img = self.transform(resized_img)
+        # Apply transform
+        transformed_img = self.transform(src_img)
         
-        bboxes = [ann['bbox'] for ann in self.annotation if ann['image_id'] == img_id]
+        bboxes = [ann['bbox'] for ann in self.annotation if ann['image_id'] == img_id][0]
         #print(f"Found {len(bboxes)} bounding boxes for image {img_id}")
-        resized_bboxes = []
-        for bbox in bboxes:
-            resized_bbox = [
-                bbox[0] * self.resize[0] / src_img.width,  # x
-                bbox[1] * self.resize[1] / src_img.height,  # y
-                bbox[2] * self.resize[0] / src_img.width,  # width
-                bbox[3] * self.resize[1] / src_img.height  # height
-            ]
-            resized_bboxes.append(resized_bbox)
+        bboxes[0] = int(bboxes[0] * self.img_size / src_img.width)  # x
+        bboxes[1] = int(bboxes[1] * self.img_size / src_img.height) # y
+        bboxes[2] = int(bboxes[2] * self.img_size / src_img.width)  # width
+        bboxes[3] = int(bboxes[3] * self.img_size / src_img.height) # height
 
-        return transformed_img, resized_bboxes
+        return transformed_img, torch.Tensor(bboxes)
 
