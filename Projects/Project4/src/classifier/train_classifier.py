@@ -25,7 +25,7 @@ else:
     print("The code will run on CPU.")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl):
+def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl, train_size):
     model.to(device)
     out_dict = {'train_acc': [],
               'test_acc': [],
@@ -39,7 +39,8 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl):
         train_correct = 0
         train_loss = []
         train_labels, train_preds = [], []  # Collect true and predicted labels
-        for data, target in train_dl:
+        for idx, (data, target) in enumerate(train_dl):
+            print(f'Start batch {idx}/{len(train_dl)}')
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             output = model(data)
@@ -72,8 +73,8 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl):
         train_f1 = f1_score(train_labels, train_preds, average='macro')
         test_f1 = f1_score(test_labels, test_preds, average='macro')
 
-        out_dict['train_acc'].append(train_correct/len(train_dl))
-        out_dict['test_acc'].append(test_correct/len(test_dl))
+        out_dict['train_acc'].append(train_correct/train_size)
+        out_dict['test_acc'].append(test_correct/train_size)
         out_dict['train_loss'].append(np.mean(train_loss))
         out_dict['test_loss'].append(np.mean(test_loss))
         out_dict['train_f1'].append(train_f1)
@@ -92,8 +93,6 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl):
     torch.save(model.state_dict(), os.path.join('trained_models',f'_class_final_model.pth'))
     logging.info(f"RUN FINISHED")
     return out_dict
-            
-
 
 if __name__ == '__main__':
     patch_size = (64,64)
@@ -103,14 +102,14 @@ if __name__ == '__main__':
     val_size = len(data) - train_size - test_size
 
     train_ds, test_ds, val_ds = random_split(data, [train_size, test_size, val_size])
-    train_dl = DataLoader(train_ds, batch_size=64, shuffle=True)
-    test_dl = DataLoader(test_ds, batch_size=64, shuffle=False)
-    val_dl = DataLoader(val_ds, batch_size=64, shuffle=False)
+    train_dl = DataLoader(train_ds, batch_size=128, shuffle=True)
+    test_dl = DataLoader(test_ds, batch_size=128, shuffle=False)
+    val_dl = DataLoader(val_ds, batch_size=128, shuffle=False)
 
-    network = SimpleClassifier(num_classes=60, resolution=patch_size)
+    network = SimpleClassifier(num_classes=data.num_categories(), resolution=patch_size)
     network.to(device)
     learning_rate = 0.01
     optimizer = torch.optim.SGD(network.parameters(), lr=learning_rate)
 
     loss = F.cross_entropy
-    train(network, optimizer, 25, loss, train_dl, test_dl, val_dl)
+    train(network, optimizer, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
