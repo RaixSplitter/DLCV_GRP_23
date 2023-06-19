@@ -311,13 +311,3 @@ if __name__ == "__main__":
         object_bboxes = [bbox_list_by_image[index] for index in object_indices]
         draw_bboxes(img, object_bboxes, [1] * len(object_bboxes), i)
 
-
-
-
-
-
-
-
-
-
-
