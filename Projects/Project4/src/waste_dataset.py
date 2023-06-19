@@ -7,8 +7,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from PIL import Image
 
 DATA_PATH = "/dtu/datasets1/02514/data_wastedetection"
-SUPERCATEGORIES = {"Aluminium foil":0, "Battery":1, "Blister pack":2, "Bottle":3, "Bottle cap":4, "Broken glass":5, "Can":6, "Carton":7, "Cup":8, "Food waste":9, "Glass jar":10, "Lid":11, "Other plastic":12, "Paper":13, "Paper bag":14, "Plastic bag & wrapper":15, "Plastic container":16, "Plastic glooves":17, "Plastic utensils":18, "Pop tab":19, "Rope & strings":20, "Scrap metal":21, "Shoe":22, "Squeezable tube":23, "Straw":24, "Styrofoam piece":25, "Unlabeled litter":26, "Cigarette":27}
-CATEGORY_RANGE = [0,1,3,6,8,9,12,19,24,25,26,28,29,33,35,42,47,48,49,50,51,52,53,54,56,57,58,59]
+SUPERCATEGORIES = ["Aluminium foil", "Bottle", "Bottle cap", "Broken glass", "Can", "Carton", "Cup", "Lid", "Other plastic", "Paper", "Plastic bag & wrapper", "Plastic container", "Pop tab", "Straw", "Styrofoam piece", "Unlabeled litter", "Cigarette"]
+UNLABELED = SUPERCATEGORIES.index("Unlabeled litter")
 
 class WasteDatasetPatches(Dataset):
     def __init__(self, transform=None, resolution=(64,64)):
@@ -20,6 +20,7 @@ class WasteDatasetPatches(Dataset):
             ])
         self.img_info = data['images']
         self.annotation = data['annotations']
+        self.categories = data['categories']
     
     def __len__(self):
         return len(self.annotation)
@@ -34,7 +35,9 @@ class WasteDatasetPatches(Dataset):
         src_img = Image.open(os.path.join(DATA_PATH,src_img_data['file_name']))
         src_img.save('original_img.png')
 
-        label = item['category_id']
+        supercat = self.categories[item['category_id']]['supercategory']
+        #if we're not using the class (not in supercategories list), set to unlabeled
+        label = SUPERCATEGORIES.index(supercat) if supercat in SUPERCATEGORIES else UNLABELED
         bbox = item['bbox']
         bounding_box = [bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]]
         subimage = src_img.crop(bounding_box)
@@ -42,7 +45,7 @@ class WasteDatasetPatches(Dataset):
         return self.transform(subimage), label
 
 class WasteDatasetImages(Dataset):
-    def __init__(self, transform=None, resize=None):
+    def __init__(self, transform=None, resize=(224,224)):
         with open(os.path.join(DATA_PATH, 'annotations.json')) as f:
             data = json.load(f)
         self.transform = transform if transform is not None else transforms.Compose([
@@ -50,6 +53,7 @@ class WasteDatasetImages(Dataset):
         ])
         self.img_info = data['images']
         self.annotation = data['annotations']
+        self.categories = data['categories']
         self.resize = resize  # Specify the desired resize dimensions
     
     def __len__(self):
@@ -78,8 +82,9 @@ class WasteDatasetImages(Dataset):
                 bbox[3] * self.resize[1] / src_img.height  # height
             ]
             resized_bboxes.append(resized_bbox)
-            subclass = patch['category_id']
-            label = next((idx for idx, x in enumerate(CATEGORY_RANGE) if subclass<=x), None)
+            supercat = self.categories[patch['category_id']]['supercategory']
+            #if we're not using the class (not in supercategories list), set to unlabeled
+            label = SUPERCATEGORIES.index(supercat) if supercat in SUPERCATEGORIES else UNLABELED
             labels.append(label)
 
         return transformed_img, resized_bboxes, labels
