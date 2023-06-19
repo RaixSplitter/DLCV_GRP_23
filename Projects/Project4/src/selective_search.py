@@ -15,7 +15,7 @@ from torchvision.transforms import ToTensor, Resize
 from PIL import Image
 import matplotlib.pyplot as plt
 from torchvision.transforms import functional as F
-from waste_dataset import WasteDataset, WasteDatasetImages
+from waste_dataset import WasteDatasetImages
 import numpy as np
 from torch.utils.data import DataLoader, random_split
 from sklearn.svm import LinearSVC
@@ -55,14 +55,11 @@ def plot_images(dataloader):
 def draw_bboxes(image, bboxes, labels, index):
     fig, ax = plt.subplots()
 
-    # Display the image
     ax.imshow(image)
 
-    # Create a Rectangle patch
     for bbox, label in zip(bboxes, labels):
         x, y, width, height = bbox
         rect = patches.Rectangle((x,y), width, height, linewidth=1, edgecolor='r' if label == 1 else 'b', facecolor='none')
-        # Add the patch to the Axes
         ax.add_patch(rect)
 
     if not os.path.exists("inference"):
@@ -101,8 +98,9 @@ def visualize_bboxes(image, proposals, ground_truth_bboxes, iou_scores):
 def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_proposals_per_image):
     proposals_list = []
     data_list = []
-    images_list = []  # Add this line to keep the images
-    features_list = []  # Add this line
+    images_list = []
+    features_list = []
+    features_list_per_image = []  # This will keep track of features per image for test visualization
 
     counter = 0
 
@@ -112,15 +110,14 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
             break
         img = image.squeeze().permute(1, 2, 0).numpy()
 
-        # Save the image to images_list
         images_list.append(img)
 
         ss.setBaseImage(img)
-        ss.switchToSelectiveSearchQuality()
+        ss.switchToSelectiveSearchQuality() #Maybe try with fast
         rects = ss.process()
 
         proposals = []
-        features = []  # Add this line
+        features = []
 
         for i, rect in enumerate(rects):
             if i >= max_proposals_per_image:
@@ -133,68 +130,18 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
             proposal_image = img[y:y+height, x:x+width]
 
             proposal_features = extract_vgg16_features(proposal_image) 
-            features.append((proposal_bbox, np.ravel(proposal_features)))  # Save features together with bounding boxes
+            features.append((proposal_bbox, np.ravel(proposal_features)))
 
         proposals_list.append(proposals)
-        features_list.extend(features)  # Add the features to the list
+        features_list.extend(features)
+        features_list_per_image.append(features)
 
         labels = assign_labels(proposals, bboxes, image)
         data_list.extend(list(zip(proposals, labels)))
 
         counter += 1
 
-    return proposals_list, data_list, features_list, images_list  # Return images_list
-
-# def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_proposals_per_image):
-#     proposals_list = []
-#     data_list = []  # This will be a list of lists
-#     images_list = []  # Add this line to keep the images
-#     features_list = []  # This will be a list of lists
-
-#     counter = 0
-
-#     for image, bboxes in dataloader:
-#         print(f"Processing image {counter + 1}/{num_images_to_process}")
-#         if counter >= num_images_to_process:
-#             break
-#         img = image.squeeze().permute(1, 2, 0).numpy()
-
-#         # Save the image to images_list
-#         images_list.append(img)
-
-#         ss.setBaseImage(img)
-#         ss.switchToSelectiveSearchQuality()
-#         rects = ss.process()
-
-#         proposals = []
-#         features = []  # This will store the features for this image
-#         image_data = []  # This will store the data for this image
-
-#         for i, rect in enumerate(rects):
-#             if i >= max_proposals_per_image:
-#                 break
-#             x, y, width, height = rect 
-#             x, y, width, height = int(x), int(y), int(width), int(height)
-#             proposal_bbox = [x, y, width, height]  
-#             proposals.append(proposal_bbox)
-
-#             proposal_image = img[y:y+height, x:x+width]
-
-#             proposal_features = extract_vgg16_features(proposal_image) 
-#             features.append((proposal_bbox, np.ravel(proposal_features)))  # Save features together with bounding boxes
-
-#             labels = assign_labels(proposals, bboxes, image)
-#             image_data.append((proposal_bbox, labels))
-
-#         proposals_list.append(proposals)
-#         features_list.append(features)  # Add the features for this image to the main list
-#         data_list.append(image_data)  # Add the data for this image to the main list
-
-#         counter += 1
-
-#     return proposals_list, data_list, features_list, images_list  # Return images_list
-
-
+    return proposals_list, data_list, features_list, images_list, features_list_per_image
 
 
 def extract_color_histogram(image):
@@ -207,18 +154,17 @@ def extract_color_histogram(image):
     return hist
 
 def extract_vgg16_features(image):
-    image = cv2.resize(image, (224, 224))  # Resize to fit VGG16 input size
-    image = torch.tensor(image).permute(2, 0, 1).float().to(device)  # Convert to torch tensor and move to GPU
-    image = image.unsqueeze(0)  # Add batch dimension
+    image = cv2.resize(image, (224, 224))
+    image = torch.tensor(image).permute(2, 0, 1).float().to(device)
+    image = image.unsqueeze(0)
 
-    with torch.no_grad():  # No need to compute gradients
+    with torch.no_grad():
         features = vgg16(image)
 
-    features = features.cpu().numpy()  # Move features to CPU and convert to numpy array
-    features = features.flatten()  # Flatten features to 1D array
+    features = features.cpu().numpy() 
+    features = features.flatten() 
 
     return features
-
 
 
 def assign_labels(proposals, bboxes, image, iou_threshold=0.5):
@@ -264,8 +210,6 @@ def assign_labels(proposals, bboxes, image, iou_threshold=0.5):
     return labels
 
 
-
-
 if __name__ == "__main__":
 
     DATA_PATH = "/dtu/datasets1/02514/data_wastedetection"
@@ -282,9 +226,9 @@ if __name__ == "__main__":
     test_size = len(dataset) - train_size
     train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-    num_images_to_process_train = 5#len(train_dataset)
-    num_images_to_process_test = 5 #len(test_dataset)
-    max_proposals_per_image = 1000
+    num_images_to_process_train = len(train_dataset) #Amount of train images to process
+    num_images_to_process_test = len(test_dataset) #Amount of test images to process
+    max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
 
     # Create dataloaders for train and test sets
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
@@ -300,7 +244,7 @@ if __name__ == "__main__":
     ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
 
     print("Generating proposals and labels for train set")
-    train_proposals, train_data, train_features, _ = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image)
+    train_proposals, train_data, train_features, _, _ = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image)
 
     # Extract the features and their corresponding bounding boxes
     train_features_flat, train_boxes = zip(*[(feature, bbox) for bbox, feature in train_features])
@@ -310,8 +254,11 @@ if __name__ == "__main__":
     train_labels = [label for _, label in train_data]
     train_labels = np.array(train_labels)
 
-    svm = LinearSVC(C=0.1, class_weight='balanced')
-    svm.fit(train_features_flat, train_labels)
+    svm = LinearSVC(C=0.1, class_weight='balanced') #balanced means that we give more weight to the minority class
+    
+    #Trains on the VGG16 features and the corresponding labels(0 or 1) Should be chnaged to multicass
+    svm.fit(train_features_flat, train_labels) 
+
     print("Training done")
     print("Saving model")
     if not os.path.exists("models"):
@@ -321,7 +268,7 @@ if __name__ == "__main__":
 
 
     print("Generating proposals and labels for test set")
-    test_proposals, test_data, test_features, test_images = generate_proposals_and_labels(test_dataloader, ss, num_images_to_process_test, max_proposals_per_image)
+    test_proposals, test_data, test_features, test_images, test_features_per_image = generate_proposals_and_labels(test_dataloader, ss, num_images_to_process_test, max_proposals_per_image)
 
     # Extract the features and their corresponding bounding boxes
     test_features_flat, test_boxes = zip(*[(feature, bbox) for bbox, feature in test_features])
@@ -346,46 +293,24 @@ if __name__ == "__main__":
     print("Recall:", recall)
     print("F1-score:", f1)
 
-    number_of_images = 5
-
-    # predictions = []
-    # for feature in test_features:
-    #     bbox, feature_hist = feature 
-    #     predictions.extend(svm.predict([feature_hist]))
-    # for i, img in enumerate(test_images[:number_of_images]):
-    #     print(f"[test_features[i][0]] {test_features[i][0]}")
-    #     draw_bboxes(img, [test_features[i][0]], [predictions[i]], i)
-
-   
-    # A list to store the predictions for each image
-    predictions_by_image = []
-
-    # A list to store the bbox for each image
-    bbox_list_by_image = []
-
-    # You iterate over each feature in test_features
-    print(f"test_features {test_features}")
-    print(f"test_features[0] {test_features[0]}")
-    print(f"len(test_features) {len(test_features)}")
-    for feature in test_features:
-        #print(f"feature {feature}")
-        bbox, feature_hist = feature 
-        prediction = svm.predict([feature_hist])[0]  # Assuming svm.predict() returns a list, taking the first element
-        #print(f"prediction {prediction}")
-        predictions_by_image.append(prediction)
-        bbox_list_by_image.append(bbox)
-
-    #print(f"predictions_by_image {predictions_by_image}")
+    number_of_images = 20 #Test images to visualize
 
     for i, img in enumerate(test_images[:number_of_images]):
-        # Get the indices of the bounding boxes that the model predicts contain an object
-        object_indices = [j for j, pred in enumerate(predictions_by_image) if pred == 1]
-        
-        # Get the corresponding bounding boxes
-        object_bboxes = [bbox_list_by_image[index] for index in object_indices]
+        features_per_image = test_features_per_image[i]
 
-        # Draw the bounding boxes that the model predicts contain an object
+        predictions_by_image = []
+        bbox_list_by_image = []
+
+        for feature in features_per_image:
+            bbox, feature_hist = feature 
+            prediction = svm.predict([feature_hist])[0] 
+            predictions_by_image.append(prediction)
+            bbox_list_by_image.append(bbox)
+
+        object_indices = [j for j, pred in enumerate(predictions_by_image) if pred == 1]            
+        object_bboxes = [bbox_list_by_image[index] for index in object_indices]
         draw_bboxes(img, object_bboxes, [1] * len(object_bboxes), i)
+
 
 
 
