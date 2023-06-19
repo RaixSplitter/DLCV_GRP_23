@@ -15,7 +15,7 @@ from torchvision.transforms import ToTensor, Resize
 from PIL import Image
 import matplotlib.pyplot as plt
 from torchvision.transforms import functional as F
-from waste_dataset import WasteDataset, WasteDatasetImages
+from waste_dataset import WasteDatasetPatches, WasteDatasetImages
 import numpy as np
 from torch.utils.data import DataLoader, random_split
 from sklearn.svm import LinearSVC
