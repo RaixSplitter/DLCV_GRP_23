@@ -88,4 +88,7 @@ class WasteDatasetImages(Dataset):
             labels.append(label)
 
         return transformed_img, resized_bboxes, labels
+    
+    def num_categories(self):
+        return len(SUPERCATEGORIES)
 
