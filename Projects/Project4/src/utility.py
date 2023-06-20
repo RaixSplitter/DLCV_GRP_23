@@ -34,7 +34,7 @@ def get_pred_from_confidence(confidence : list[float], threshold : float = 0.5) 
 
 def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4) -> list[list[float]]:
 
-    #bbox : [x, y, w, h, class, confidence] 
+    #bbox : [[x, y, w, h], class, confidence] 
     #bboxes : list[bbox]
     
 
@@ -42,9 +42,9 @@ def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4) -> list[lis
     bbox_list_new = []
     
     #Sort and filter bbox
-    boxes_sorted = sorted(bboxes, key=lambda x: x[5], reverse=True)
+    boxes_sorted = sorted(bboxes, key=lambda x: x[2], reverse=True)
     for bbox in boxes_sorted:
-        if bbox[5] > conf_threshold:
+        if bbox[2] > conf_threshold:
             bbox_list_threshold.append(bbox)
     
     #Remove boxes with high IOU
@@ -52,8 +52,8 @@ def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4) -> list[lis
         current_bbox = bbox_list_threshold.pop(0)
         bbox_list_new.append(current_bbox)
         for bbox in bbox_list_threshold:
-            if current_bbox[4] == bbox[4]:
-                iou = calculate_iou(current_bbox[:4], bbox[:4])
+            if current_bbox[1] == bbox[1]:
+                iou = calculate_iou(current_bbox[0], bbox[0])
                 if iou > iou_threshold:
                     bbox_list_threshold.remove(bbox)
 
@@ -61,10 +61,10 @@ def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4) -> list[lis
 
 #mAP
 def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[float]], threshold_iot : float = 0.5, plot = False) -> float:
-    #bbox = [x, y, w, h, class, confidence]
+    #bbox = [[x, y, w, h], class, confidence]
 
     #sort bboxes by confidence
-    boxes_sorted = sorted(bbox_pred, key=lambda x: x[5], reverse=True)
+    boxes_sorted = sorted(bbox_pred, key=lambda x: x[2], reverse=True)
 
     #slice duplicate bbox_true
     bbox_gt = bbox_true[:]
@@ -74,8 +74,8 @@ def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[
     for bbox in boxes_sorted:
         for gt in bbox_gt:
             #compute iou
-            iou = calculate_iou(bbox[:4], gt[:4])
-            if iou > threshold_iot and bbox[4] == gt[4]:
+            iou = calculate_iou(bbox[0], gt[0])
+            if iou > threshold_iot and bbox[1] == gt[1]:
                 #remove bbox from gt
                 bbox_gt.remove(gt)
 
@@ -112,67 +112,9 @@ def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[
 
     return average_precision, precision, recall
 
-def sklearn_map(y_true : list[bool], confidence : list[float], threshold : float = 0.5) -> None:
-    y_pred = get_pred_from_confidence(confidence, threshold)
-
-    precision, recall, _ = precision_recall_curve(y_true, y_pred)
-    disp = PrecisionRecallDisplay(precision=precision, recall=recall)
-    disp.plot()
-    plt.show()
-    plt.savefig("SKprecision_recall_curve.png")    
-
-def get_confusion_matrix(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot : bool = False) -> None:
-    y_pred = get_pred_from_confidence(confidence, threshold)
-
-    #cm
-    cm = confusion_matrix(y_true, y_pred)
-
-
-    if not plot:
-        return cm
-    #seaborn heatmap
-    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues')
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
-    plt.title("Confusion Matrix")
-    plt.show()
-    plt.savefig("confusion_matrix.png")
-
-    return cm
-
-def get_metrics(y_true : list[bool], y_pred : list[bool]) -> dict:
-    #if y_pred is confidence scores, convert to bool
-    if len(y_pred) > 0 and type(y_pred[0]) == float:
-        y_pred = get_pred_from_confidence(y_pred)
-    
-    metric = {}
-    #Calculate metrics
-    metric["accuracy"] = accuracy_score(y_true, y_pred)
-    metric["precision"] = precision_score(y_true, y_pred)
-    metric["recall"] = recall_score(y_true, y_pred)
-    metric["f1"] = f1_score(y_true, y_pred)
-    metric["confusion_matrix"] = confusion_matrix(y_true, y_pred)
-    metric["average_precision"] = average_precision_score(y_true, y_pred)
-    metric["jaccard"] = jaccard_score(y_true, y_pred)
-
-    return metric
-
 
 
 if __name__ == '__main__':
     print("Running utility.py")
-    bbox1 = [0, 0, 10, 10]
-    bbox2 = [5, 5, 10, 10]
-    iou = calculate_iou(bbox1, bbox2)
-    print(iou)
-
-    y_pred = [0.1, 0.4, 0.35, 0.8, 0.9, 0.2, 0.7, 0.6, 0.3, 0.5]
-    y_true = [True, False, False, False, True, False, True, False, True, True]
-    print(y_true)
-
-    sklearn_map(y_true, y_pred)
-    get_confusion_matrix(y_true, y_pred, plot = True)
-
-
     
     print("Done running utility.py")
