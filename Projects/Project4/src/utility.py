@@ -83,8 +83,8 @@ def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[
             match.append(False)
         
     #calculate precision and recall
-    precision = [sum(match[:i+1]) / (i+1) for i in range(len(match))]
-    recall = [sum(match[:i+1]) / len(bbox_gt) for i in range(len(match))]
+    precision = [round(sum(match[:i+1]) / (i+1),2) for i in range(len(match))]
+    recall = [round(sum(match[:i+1]) / len(bbox_true),2) for i in range(len(match))]
 
     #calculate average precision
     average_precision = 0
@@ -107,7 +107,7 @@ def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[
     plt.show()
     plt.savefig("precision_recall_curve.png")
 
-    return average_precision, precision, recall
+    return round(average_precision,2), precision, recall
 
 
 
