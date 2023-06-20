@@ -2,7 +2,6 @@ from sklearn.metrics import confusion_matrix, precision_recall_curve, PrecisionR
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, jaccard_score, average_precision_score
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 
 def calculate_iou(bbox1 : list[float], bbox2 : list[float]) -> float:
     # bbox : [x, y, w, h]    
@@ -92,8 +91,10 @@ def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[
     recall = [sum(match[:i+1]) / len(bbox_gt) for i in range(len(match))]
 
     #calculate average precision
-    average_precision = np.trapz(y = precision, x = recall)
-
+    average_precision = 0
+    for i in range(len(precision)-1):
+        average_precision += (recall[i+1] - recall[i]) * precision[i+1]
+    average_precision += recall[0] * precision[0]
 
     if not plot:
         return average_precision, precision, recall
