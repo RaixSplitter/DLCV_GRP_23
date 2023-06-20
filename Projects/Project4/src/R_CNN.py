@@ -300,8 +300,8 @@ num_images_to_process_train = len(train_dataset) #Amount of train images to proc
 num_images_to_process_test = len(test_dataset) #Amount of test images to process
 max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
 ### Quick limit for debugging/testing
-num_images_to_process_train = 8 #Amount of train images to process
-num_images_to_process_test = 2 #Amount of test images to process
+# num_images_to_process_train = 8 #Amount of train images to process
+# num_images_to_process_test = 2 #Amount of test images to process
 
 # Create dataloaders for train and test sets
 train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
