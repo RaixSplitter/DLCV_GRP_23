@@ -59,38 +59,58 @@ def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4) -> list[lis
 
     return bbox_list_new
 
-def mean_average_precision(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot = False) -> float:
-    y_pred = get_pred_from_confidence(confidence, threshold)
+#mAP
+def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[float]], threshold_iot : float = 0.5, plot = False) -> float:
+    #bbox = [x, y, w, h, class, confidence]
 
-    precision_scores = []
-    recall_scores = []
-    for i in range(1, len(y_pred)+1):
-        #Calculate precision and recall
-        precision = precision_score(y_true[:i], y_pred[:i])
-        recall = recall_score(y_true[:i], y_pred[:i])
+    #sort bboxes by confidence
+    boxes_sorted = sorted(bbox_pred, key=lambda x: x[5], reverse=True)
 
-        #Append to list
-        precision_scores.append(precision)
-        recall_scores.append(recall)
+    #slice duplicate bbox_true
+    bbox_gt = bbox_true[:]
 
-    #Calculate average precision
-    average_precision = sum(precision_scores) / len(precision_scores)
-    
+    match = []
+
+    for bbox in boxes_sorted:
+        for gt in bbox_gt:
+            #compute iou
+            iou = calculate_iou(bbox[:4], gt[:4])
+            if iou > threshold_iot and bbox[4] == gt[4]:
+                #remove bbox from gt
+                bbox_gt.remove(gt)
+
+                #append bbox to match
+                match.append(True)
+                break
+        else:
+            match.append(False)
+        
+    #calculate precision and recall
+    precision = [sum(match[:i+1]) / (i+1) for i in range(len(match))]
+    recall = [sum(match[:i+1]) / len(bbox_gt) for i in range(len(match))]
+
+    #calculate average precision
+    average_precision = 0
+    for i in range(len(precision)-1):
+        average_precision += (recall[i+1] - recall[i]) * precision[i+1]
+    average_precision += recall[0] * precision[0]
+
     if not plot:
-        return average_precision, precision_scores, recall_scores
+        return average_precision, precision, recall
+
 
     #plot precision-recall curve
     fig, ax = plt.subplots()
-    sns.scatterplot(x = recall_scores, y = precision_scores, marker = '*', s = 200, ax=ax)
-    for i in range(len(precision_scores)):
-        ax.annotate(i+1, (recall_scores[i], precision_scores[i]))
+    sns.scatterplot(x = recall, y = precision, marker = '*', s = 200, ax=ax)
+    for i in range(len(precision)):
+        ax.annotate(i+1, (recall[i], precision[i]))
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
     ax.set_title("Precision-Recall Curve")
     plt.show()
     plt.savefig("precision_recall_curve.png")
 
-    return average_precision, precision_scores, recall_scores
+    return average_precision, precision, recall
 
 def sklearn_map(y_true : list[bool], confidence : list[float], threshold : float = 0.5) -> None:
     y_pred = get_pred_from_confidence(confidence, threshold)
@@ -150,7 +170,6 @@ if __name__ == '__main__':
     y_true = [True, False, False, False, True, False, True, False, True, True]
     print(y_true)
 
-    mean_average_precision(y_true, y_pred, plot = True)
     sklearn_map(y_true, y_pred)
     get_confusion_matrix(y_true, y_pred, plot = True)
 
