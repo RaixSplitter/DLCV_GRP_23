@@ -142,8 +142,8 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
         
         # selective search
         ss.setBaseImage(img)
-        ss.switchToSelectiveSearchQuality() #Maybe try with fast
-        # ss.switchToSelectiveSearchFast()
+        # ss.switchToSelectiveSearchQuality() #Maybe try with fast
+        ss.switchToSelectiveSearchFast()
         rects = ss.process()
 
         proposal_bbox   = []
@@ -173,7 +173,7 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
         # Limit background patches, ratio 8 to 1 non background 
         num_non_bg = len(labels) - labels.count(0)
         num_bg     = labels.count(0)
-        limit_bg   = num_non_bg*8
+        limit_bg   = num_non_bg*3
         if limit_bg < num_bg: # Too many backgrounds
             transfer_labels = []
             transfer_bboxes = []
@@ -212,7 +212,7 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
     images = torch.tensor(images)
     return data_list, proposals_box_list, resized_images, proposals_labels, images
 
-def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.4, iou_threshold2=0.6): # 
+def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3, iou_threshold2=0.7): # 
     labels = []
     iou_scores = []
     
@@ -271,7 +271,7 @@ def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.4
 ctest = 0
 ctrain = 0
 patch_size = (128,128)
-batch_size = 100
+batch_size = 64
 
 dataset = WasteDatasetImages(transform=transforms.ToTensor(), resize=(512,512))
 num_classes = dataset.num_categories()
@@ -285,7 +285,7 @@ train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 num_images_to_process_train = len(train_dataset) #Amount of train images to process
 num_images_to_process_test = len(test_dataset) #Amount of test images to process
 max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
-# # # Quick limit for debugging/testing
+### Quick limit for debugging/testing
 # num_images_to_process_train = 8 #Amount of train images to process
 # num_images_to_process_test = 2 #Amount of test images to process
 
