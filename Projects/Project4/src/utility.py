@@ -3,7 +3,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_sc
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def calculate_iou(bbox1 : list[float], bbox2 : list[float]):
+def calculate_iou(bbox1 : list[float], bbox2 : list[float]) -> float:
     # bbox : [x, y, w, h]    
 
     #Unpack bboxes
@@ -28,11 +28,11 @@ def calculate_iou(bbox1 : list[float], bbox2 : list[float]):
 
     return float(iou)
 
-def get_pred_from_confidence(confidence : list[float], threshold : float = 0.5):
+def get_pred_from_confidence(confidence : list[float], threshold : float = 0.5) -> list[bool]:
     y_pred = [True if score >= threshold else False for score in confidence]
     return y_pred
 
-def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4):
+def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4) -> list[list[float]]:
 
     #bbox : [x, y, w, h, class, confidence] 
     #bboxes : list[bbox]
@@ -59,7 +59,7 @@ def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4):
 
     return bbox_list_new
 
-def mean_average_precision(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot = False):
+def mean_average_precision(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot = False) -> float:
     y_pred = get_pred_from_confidence(confidence, threshold)
 
     precision_scores = []
@@ -92,7 +92,7 @@ def mean_average_precision(y_true : list[bool], confidence : list[float], thresh
 
     return average_precision, precision_scores, recall_scores
 
-def sklearn_map(y_true : list[bool], confidence : list[float], threshold : float = 0.5):
+def sklearn_map(y_true : list[bool], confidence : list[float], threshold : float = 0.5) -> None:
     y_pred = get_pred_from_confidence(confidence, threshold)
 
     precision, recall, _ = precision_recall_curve(y_true, y_pred)
@@ -101,7 +101,7 @@ def sklearn_map(y_true : list[bool], confidence : list[float], threshold : float
     plt.show()
     plt.savefig("SKprecision_recall_curve.png")    
 
-def get_confusion_matrix(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot : bool = False):
+def get_confusion_matrix(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot : bool = False) -> None:
     y_pred = get_pred_from_confidence(confidence, threshold)
 
     #cm
@@ -120,7 +120,7 @@ def get_confusion_matrix(y_true : list[bool], confidence : list[float], threshol
 
     return cm
 
-def get_metrics(y_true : list[bool], y_pred : list[bool]):
+def get_metrics(y_true : list[bool], y_pred : list[bool]) -> dict:
     #if y_pred is confidence scores, convert to bool
     if len(y_pred) > 0 and type(y_pred[0]) == float:
         y_pred = get_pred_from_confidence(y_pred)
