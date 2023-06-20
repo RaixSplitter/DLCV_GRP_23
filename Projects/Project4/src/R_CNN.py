@@ -16,9 +16,10 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from tqdm import tqdm
 
 # Own
-from waste_dataset import WasteDatasetImages
+from waste_dataset import WasteDatasetImages, SUPERCATEGORIES
 from classifier.simpleCNN import SimpleClassifier
 from classifier.train_classifier import train
+
 
 
 # %%
@@ -312,8 +313,8 @@ ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
 
 print("Generating proposals and labels for train set")
 train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image, img_shape=patch_size)
-plot_images_jupyter(images_og, image_idx, train_proposals, train_label) # Plot with labels
-raise Exception()
+# plot_images_jupyter(images_og, image_idx, train_proposals, train_label) # Plot with labels
+# raise Exception()
 
 # Extract the features and their corresponding bounding boxes
 # train_features_flat, train_boxes = zip(*[(feature, bbox) for bbox, feature in train_features])

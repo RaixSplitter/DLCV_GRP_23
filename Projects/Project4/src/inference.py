@@ -24,8 +24,8 @@ from waste_dataset import WasteDatasetImages
 from classifier.resnet18 import resnet18, resnet18_inference
 from R_CNN import* 
 from utility import*
-    # %%
-    # Main
+# %%
+# Main
 
 def plot_image_with_boxes(image, bboxes, labels, title, filename):
     fig, ax = plt.subplots(1)
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     # Create dataloaders for train and test sets
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+    test_dataloader  = DataLoader(test_dataset,  batch_size=1, shuffle=False)
     real_bbox_label_pairs = []
     real_bbox_label_image_vis = []  # for visualization purposes
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     model.eval()
 
 
-    _, proposals_box_list, resized_images, _, _, proposals_per_image = generate_proposals_and_labels(test_dataloader, ss, num_images_to_process_test, max_proposals_per_image)
+    _, proposals_box_list, resized_images, _, _, proposals_per_image, image_idx = generate_proposals_and_labels(test_dataloader, ss, num_images_to_process_test, max_proposals_per_image)
 
     resized_images_array = np.array(resized_images, dtype=np.float32)
     resized_images_tensor = torch.from_numpy(resized_images_array)
