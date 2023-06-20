@@ -32,32 +32,28 @@ def get_pred_from_confidence(confidence : list[float], threshold : float = 0.5) 
     y_pred = [True if score >= threshold else False for score in confidence]
     return y_pred
 
-def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4) -> list[list[float]]:
+def no_max_supression(bboxes, iou_threshold=0.4) -> list[list[float]]:
 
     #bbox : [[x, y, w, h], class, confidence] 
     #bboxes : list[bbox]
-    
 
-    bbox_list_threshold = []
-    bbox_list_new = []
+    bbox_list_result = []
     
     #Sort and filter bbox
     boxes_sorted = sorted(bboxes, key=lambda x: x[2], reverse=True)
-    for bbox in boxes_sorted:
-        if bbox[2] > conf_threshold:
-            bbox_list_threshold.append(bbox)
     
     #Remove boxes with high IOU
-    while len(bbox_list_threshold) > 0:
-        current_bbox = bbox_list_threshold.pop(0)
-        bbox_list_new.append(current_bbox)
-        for bbox in bbox_list_threshold:
-            if current_bbox[1] == bbox[1]:
+    while boxes_sorted:
+        current_bbox = boxes_sorted.pop() #get bbox with highest confidence
+        bbox_list_result.append(current_bbox)
+
+        for bbox in boxes_sorted[:]:
+            if current_bbox[1] == bbox[1]: #if same class
                 iou = calculate_iou(current_bbox[0], bbox[0])
                 if iou > iou_threshold:
-                    bbox_list_threshold.remove(bbox)
+                    boxes_sorted.remove(bbox)
 
-    return bbox_list_new
+    return bbox_list_result
 
 #mAP
 def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[float]], threshold_iot : float = 0.5, plot = False) -> float:
@@ -117,5 +113,25 @@ def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[
 
 if __name__ == '__main__':
     print("Running utility.py")
-    
+    bboxes = [
+    [[189, 22, 32, 28], 5, 0.23136208951473236],
+    [[107, 169, 19, 63], 6, 0.4421188235282898],
+    [[109, 169, 17, 66], 6, 0.337564617395401],
+    [[32, 180, 19, 24], 6, 0.24561572074890137],
+    [[108, 173, 17, 59], 6, 0.3550938367843628],
+    [[189, 14, 33, 36], 5, 0.23134583234786987],
+    [[108, 172, 17, 55], 6, 0.20247505605220795],
+    [[9, 149, 23, 26], 5, 0.24931873381137848],
+    [[108, 173, 19, 59], 6, 0.38591429591178894],
+    [[188, 22, 34, 28], 5, 0.1905873566865921],
+    [[108, 173, 18, 59], 6, 0.345272034406662],
+    [[32, 181, 14, 22], 6, 0.24699757993221283],
+    [[108, 172, 17, 60], 6, 0.36766287684440613],
+    [[108, 172, 19, 60], 6, 0.3239368498325348],
+    ]
+
+    new_bb = no_max_supression(bboxes, iou_threshold=0.4)
+    print(new_bb)
+
+
     print("Done running utility.py")
