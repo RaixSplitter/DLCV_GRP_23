@@ -92,8 +92,10 @@ def mean_average_precision(bbox_true : list[list[float]], bbox_pred : list[list[
     recall = [sum(match[:i+1]) / len(bbox_gt) for i in range(len(match))]
 
     #calculate average precision
-    average_precision = np.trapz(y = precision, x = recall)
-
+    average_precision = 0
+    for i in range(len(precision)-1):
+        average_precision += (recall[i+1] - recall[i]) * precision[i+1]
+    average_precision += recall[0] * precision[0]
 
     if not plot:
         return average_precision, precision, recall
