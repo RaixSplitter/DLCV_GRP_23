@@ -10,7 +10,8 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
-from torchvision.transforms import functional as F
+# from torchvision.transforms import functional as F
+from torch.nn import functional as F
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from tqdm import tqdm
 
@@ -25,8 +26,6 @@ DATA_PATH = "/dtu/datasets1/02514/data_wastedetection"
 output_dir = "output_images"
 os.makedirs(output_dir, exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"The code will run on {device}")
-assert device.type == "cuda", "No GPU"
 
 # %%
 def plot_images(dataloader):    # save image with bboxes
@@ -113,6 +112,16 @@ def visualize_bboxes(image, proposals, ground_truth_bboxes, iou_scores):
     plt.axis('off')
     plt.savefig('bbox_visualization.png')
     plt.close(fig)
+    
+
+def extract_color_histogram(image):
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    hist = cv2.calcHist([hsv_image], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
+
+    hist = cv2.normalize(hist, hist).flatten()
+
+    return hist
 
 
 def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_proposals_per_image, img_shape = (224,224)):
@@ -127,86 +136,96 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
     for image, gt_bboxes, gt_label in tqdm(dataloader, desc=f"Processing images",total=num_images_to_process, leave=True):
         if counter >= num_images_to_process:
             break
-        
+
         img = image.squeeze().permute(1, 2, 0).numpy()
         images.append(img)
         
         # selective search
         ss.setBaseImage(img)
-        # ss.switchToSelectiveSearchQuality() #Maybe try with fast
-        ss.switchToSelectiveSearchFast()
+        ss.switchToSelectiveSearchQuality() #Maybe try with fast
+        # ss.switchToSelectiveSearchFast()
         rects = ss.process()
 
         proposal_bbox   = []
         proposal_image  = []
-        labels          = []
 
         for i, rect in enumerate(rects): # loop for each region in image
-            if i >= max_proposals_per_image:
+            if i >= max_proposals_per_image: 
                 break
-            x, y, width, height = rect 
-            bbox = [int(x), int(y), int(width), int(height)]  
+            x, y, width, height = rect
+            bbox = [int(x), int(y), int(width), int(height)]
             proposal_bbox.append(bbox)
             
             proposal_img = img[y:y+height, x:x+width]
             proposal_img = cv2.resize(proposal_img, img_shape)
-            
-            # proposal_features = extract_vgg16_features(proposal_image)
-            proposal_image.append(np.ravel(proposal_img))
+            proposal_img = np.transpose(proposal_img, [2,0,1]) # Rearrange axis
+            proposal_image.append(proposal_img)
 
         labels = assign_labels(proposal_bbox, gt_bboxes, gt_label, image)
         
         # Remove gray-zones (inbetween threshold)
         for i, label in reversed(list(enumerate(labels))):
             if label == -1:
-                del proposal_bbox[i]
                 del labels[i]
+                del proposal_bbox[i]
+                del proposal_image[i]
         
-        # Append
-        proposals_box_list.append(proposal_bbox)
-        resized_images.append(proposal_image)
-        proposals_labels.append(labels)
+        # Limit background patches, ratio 8 to 1 non background 
+        num_non_bg = len(labels) - labels.count(0)
+        num_bg     = labels.count(0)
+        limit_bg   = num_non_bg*8
+        if limit_bg < num_bg: # Too many backgrounds
+            transfer_labels = []
+            transfer_bboxes = []
+            transfer_images = []
+            for idx in range(len(labels)):
+                if labels[idx] == 0 and limit_bg == 0:  
+                    continue
+                elif labels[idx] == 0:                  
+                    limit_bg -= 1
+                transfer_labels.append(        labels[idx])
+                transfer_bboxes.append( proposal_bbox[idx])
+                transfer_images.append(proposal_image[idx])
+            labels          = transfer_labels
+            proposal_bbox   = transfer_bboxes
+            proposal_image  = transfer_images
+        
+        # # Adding ground truth     # Err0r: gt-bbox may be too small due to transforming, resulting in proposal_img = None 
+        # for idx in range(len(gt_label)):
+        #     labels.append(int(gt_label[idx]))
+        #     x, y, width, height = int(gt_bboxes[idx][0]), int(gt_bboxes[idx][1]), int(gt_bboxes[idx][2]), int(gt_bboxes[idx][3]) 
+        #     bbox = [x, y, width, height]
+        #     proposal_bbox.append(bbox)
+        #     proposal_img = img[y:y+height, x:x+width]
+        #     proposal_img = cv2.resize(proposal_img, img_shape)
+        #     proposal_img = np.transpose(proposal_img, [2,0,1])
+        #     proposal_image.append(proposal_img)
+        
+        # Extend
+        proposals_box_list.extend(proposal_bbox)
+        resized_images.extend(proposal_image)
+        proposals_labels.extend(labels)
         data_list.extend(list(zip(proposal_bbox, labels)))
 
         counter += 1
-
+        
+    images = torch.tensor(images)
     return data_list, proposals_box_list, resized_images, proposals_labels, images
-
-def extract_color_histogram(image):
-    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-    hist = cv2.calcHist([hsv_image], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
-
-    hist = cv2.normalize(hist, hist).flatten()
-
-    return hist
-
-# def extract_vgg16_features(image):
-#     image = cv2.resize(image, (224, 224))
-#     image = torch.tensor(image).permute(2, 0, 1).float().to(device)
-#     image = image.unsqueeze(0)
-#
-#     with torch.no_grad():
-#         features = vgg16(image)
-#
-#     features = features.cpu().numpy() 
-#     features = features.flatten() 
-#
-#     return features
-
 
 def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.4, iou_threshold2=0.6): # 
     labels = []
     iou_scores = []
-
+    
+    max_iou_failsafe        = -1    # In case of no positive, use the best 
+    max_iou_failsafe_info   = None  #/
     image = image.squeeze().permute(1, 2, 0).numpy()
     
     for proposal in proposals_bbox:
         proposal_x1, proposal_y1, proposal_w, proposal_h = proposal
         proposal_area = proposal_w * proposal_h
 
-        max_iou = -1  # Initialize max IOU score for each proposal
-        max_label_idx = -1
+        max_iou             = -1 # Initialize max IOU score for each proposal
+        max_label_idx       = -1
 
         for idx, bbox in enumerate(gt_bboxes):
             bbox_x1, bbox_y1, bbox_w, bbox_h = bbox
@@ -228,24 +247,33 @@ def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.4
             if iou > max_iou:
                 max_iou         = iou
                 max_label_idx   = idx
-        if   max_iou <= iou_threshold1: labels.append(0)         # Object proposal is a negative example
-        elif max_iou >= iou_threshold2: labels.append(int(gt_label[max_label_idx]))  # Object proposal is a positive example
-        else:                           labels.append(-1)        # Object proposal is not considered
-    num_ones = len(labels)
+            #
+            if iou > max_iou_failsafe:
+                max_iou_failsafe        = iou
+                max_iou_failsafe_info   = (proposal, idx)
+            
+        if   max_iou <= iou_threshold1: labels.append(0)                            # Object proposal is a negative example
+        elif max_iou >= iou_threshold2: labels.append(int(gt_label[max_label_idx])) # Object proposal is a positive example
+        else:                           labels.append(-1)                           # Object proposal is not considered
+    if labels.count(0) == len(labels):
+        idx         = proposals_bbox.index(max_iou_failsafe_info[0])
+        labels[idx] = int(gt_label[max_iou_failsafe_info[1]])
+    # num_ones = len(labels)
     # print(f"Number of objects: {num_ones}")
 
     # To visualize the bounding boxes and IOU scores, uncomment the following line
     #visualize_bboxes(image, proposals, bboxes, iou_scores)
-    return labels    
+    return labels
 
 
 # %%
 # Main
 ctest = 0
 ctrain = 0
-patch_size  = (64,64)
+patch_size = (128,128)
+batch_size = 100
 
-dataset = WasteDatasetImages(transform=transforms.ToTensor(), resize=(224, 224))
+dataset = WasteDatasetImages(transform=transforms.ToTensor(), resize=(512,512))
 num_classes = dataset.num_categories()
 print(f"Total number of categories: {num_classes}")
 
@@ -257,7 +285,7 @@ train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 num_images_to_process_train = len(train_dataset) #Amount of train images to process
 num_images_to_process_test = len(test_dataset) #Amount of test images to process
 max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
-# # Quick limit for debugging/testing
+# # # Quick limit for debugging/testing
 # num_images_to_process_train = 8 #Amount of train images to process
 # num_images_to_process_test = 2 #Amount of test images to process
 
@@ -281,21 +309,19 @@ train_data, train_proposals, train_proposals_image, train_label, images_og = gen
 # train_labels = [label for _, label in train_data]
 # train_labels = np.array(train_labels)
 
-train_size = int(0.75*len(train_data))
-test_size = int(0.15*len(train_data))
-val_size = len(train_data) - train_size - test_size 
+train_size = int(0.75*len(train_proposals_image))
+test_size = int(0.15*len(train_proposals_image))
+val_size = len(train_proposals_image) - train_size - test_size 
 
-train_ds, test_ds, val_ds = random_split(train_data, [train_size, test_size, val_size])
-train_dl = DataLoader(train_ds, batch_size=128, shuffle=True)
-test_dl = DataLoader(test_ds, batch_size=128, shuffle=False)
-val_dl = DataLoader(val_ds, batch_size=128, shuffle=False)
+train_ds, test_ds, val_ds = random_split(list(zip(train_proposals_image,train_label)), [train_size, test_size, val_size])
+train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True )
+test_dl  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False)
+val_dl   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
 # Load model
 print("Loading Simple classifier model")
 network = SimpleClassifier(num_classes, )
 network.to(device)
-
-
 
 network = SimpleClassifier(num_classes=num_classes, resolution=patch_size)
 network.to(device)
@@ -305,14 +331,14 @@ loss = F.cross_entropy
 train(network, optimizer, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
 
 
-print("Training done")
-print("Saving model")
-if not os.path.exists("models"):
-    os.makedirs("models")
-
+# print("Training done")
+# print("Saving model")
+# if not os.path.exists("models"):
+#     os.makedirs("models")
 # dump(svm, 'models/svm_model.joblib')
 
 
+# %%
 # print("Generating proposals and labels for test set")
 # test_data, test_proposals, test_image, test_label = generate_proposals_and_labels(test_dataloader, ss, num_images_to_process_test, max_proposals_per_image)
 
@@ -356,7 +382,5 @@ if not os.path.exists("models"):
 #     object_indices = [j for j, pred in enumerate(predictions_by_image) if pred == 1]            
 #     object_bboxes = [bbox_list_by_image[index] for index in object_indices]
 #     draw_bboxes(img, object_bboxes, [1] * len(object_bboxes), i)
-
-
 
 
