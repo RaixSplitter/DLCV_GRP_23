@@ -1,4 +1,5 @@
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, precision_recall_curve, PrecisionRecallDisplay
+from sklearn.metrics import confusion_matrix, precision_recall_curve, PrecisionRecallDisplay
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, jaccard_score, average_precision_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -58,12 +59,12 @@ def no_max_supression(bboxes, conf_threshold=0.7, iou_threshold=0.4):
 
     return bbox_list_new
 
-def mean_average_precision(y_true : list[bool], confidence : list[float], threshold : float = 0.5):
+def mean_average_precision(y_true : list[bool], confidence : list[float], threshold : float = 0.5, plot = False):
     y_pred = get_pred_from_confidence(confidence, threshold)
 
     precision_scores = []
     recall_scores = []
-    for i in range(1, len(y_pred)):
+    for i in range(1, len(y_pred)+1):
         #Calculate precision and recall
         precision = precision_score(y_true[:i], y_pred[:i])
         recall = recall_score(y_true[:i], y_pred[:i])
@@ -74,13 +75,18 @@ def mean_average_precision(y_true : list[bool], confidence : list[float], thresh
 
     #Calculate average precision
     average_precision = sum(precision_scores) / len(precision_scores)
+    
+    if not plot:
+        return average_precision, precision_scores, recall_scores
 
     #plot precision-recall curve
-    fig = plt.figure(figsize=(10,10))
-    plt.plot(x = recall_scores, y = precision_scores)
-    plt.xlabel("Recall")
-    plt.ylabel("Precision")
-    plt.title("Precision-Recall Curve")
+    fig, ax = plt.subplots()
+    sns.scatterplot(x = recall_scores, y = precision_scores, marker = '*', s = 200, ax=ax)
+    for i in range(len(precision_scores)):
+        ax.annotate(i+1, (recall_scores[i], precision_scores[i]))
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
+    ax.set_title("Precision-Recall Curve")
     plt.show()
     plt.savefig("precision_recall_curve.png")
 
@@ -114,4 +120,40 @@ def get_confusion_matrix(y_true : list[bool], confidence : list[float], threshol
 
     return cm
 
+def get_metrics(y_true : list[bool], y_pred : list[bool]):
+    #if y_pred is confidence scores, convert to bool
+    if len(y_pred) > 0 and type(y_pred[0]) == float:
+        y_pred = get_pred_from_confidence(y_pred)
+    
+    metric = {}
+    #Calculate metrics
+    metric["accuracy"] = accuracy_score(y_true, y_pred)
+    metric["precision"] = precision_score(y_true, y_pred)
+    metric["recall"] = recall_score(y_true, y_pred)
+    metric["f1"] = f1_score(y_true, y_pred)
+    metric["confusion_matrix"] = confusion_matrix(y_true, y_pred)
+    metric["average_precision"] = average_precision_score(y_true, y_pred)
+    metric["jaccard"] = jaccard_score(y_true, y_pred)
 
+    return metric
+
+
+
+if __name__ == '__main__':
+    print("Running utility.py")
+    bbox1 = [0, 0, 10, 10]
+    bbox2 = [5, 5, 10, 10]
+    iou = calculate_iou(bbox1, bbox2)
+    print(iou)
+
+    y_pred = [0.1, 0.4, 0.35, 0.8, 0.9, 0.2, 0.7, 0.6, 0.3, 0.5]
+    y_true = [True, False, False, False, True, False, True, False, True, True]
+    print(y_true)
+
+    mean_average_precision(y_true, y_pred, plot = True)
+    sklearn_map(y_true, y_pred)
+    get_confusion_matrix(y_true, y_pred, plot = True)
+
+
+    
+    print("Done running utility.py")
