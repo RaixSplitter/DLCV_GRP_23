@@ -53,22 +53,30 @@ def plot_images(dataloader):    # save image with bboxes
 
     print("Images with bounding boxes saved.")
 
-def plot_images_jupyter(images_og, train_proposals, train_label, num_images = 8):
-    num_images = num_images
-    for idx, (image, bboxes, labels) in enumerate(zip(images_og, train_proposals, train_label)):
-        if idx >= num_images:
-            break
-
+def plot_images_jupyter(images_og, image_idx, train_proposals, train_label, num_images = 8):
+    def_colors = ["red", "blue", "orange", "purple", "cyan", "pink", "olive", "yellow", "navy"]
+    num_images   = num_images
+    counter      = 0
+    prev_img_idx = image_idx[0]
+    for idx in range(num_images):
         fig, ax = plt.subplots()
-        ax.imshow(image)
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        ax.imshow(images_og[idx])
         has_label = set()
-        for bbox,lab in zip(bboxes, labels):
-            # bbox = [item.item() for item in bbox]
-            x, y, width, height = bbox
-            rect = patches.Rectangle((x, y), width, height, linewidth=1, edgecolor='r' if lab == 0 else "blue", facecolor='none', label = lab if lab not in has_label else "")
+        while True:
+            if counter+1 == len(train_label) or image_idx[counter] != prev_img_idx:
+                prev_img_idx = image_idx[counter]
+                break
+            lab = train_label[counter]
+            x, y, width, height = train_proposals[counter]
+            rect = patches.Rectangle((x, y), width, height, linewidth=min(3,2*lab+1), edgecolor=def_colors[lab], 
+                                     facecolor='none', label = SUPERCATEGORIES[lab] if lab not in has_label else "")
             ax.add_patch(rect)
             has_label.add(lab)
+            counter += 1
         ax.legend()
+        fig.savefig(f"Patch_{idx}.png")
 
 def draw_bboxes(image, bboxes, labels, index):
     fig, ax = plt.subplots()
@@ -130,6 +138,7 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
     resized_images      = []
     proposals_box_list  = []
     proposals_labels    = []
+    image_idx           = []
     
     counter = 0
 
@@ -169,6 +178,7 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
                 del labels[i]
                 del proposal_bbox[i]
                 del proposal_image[i]
+        # assert len(proposal_bbox) != 0, proposal_bbox
         
         # Limit background patches, ratio 8 to 1 non background 
         num_non_bg = len(labels) - labels.count(0)
@@ -179,7 +189,7 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
             transfer_bboxes = []
             transfer_images = []
             for idx in range(len(labels)):
-                if labels[idx] == 0 and limit_bg == 0:  
+                if labels[idx] == 0 and limit_bg == 0:
                     continue
                 elif labels[idx] == 0:                  
                     limit_bg -= 1
@@ -199,18 +209,20 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
         #     proposal_img = img[y:y+height, x:x+width]
         #     proposal_img = cv2.resize(proposal_img, img_shape)
         #     proposal_img = np.transpose(proposal_img, [2,0,1])
-        #     proposal_image.append(proposal_img)
+        #     proposal_image.append(proposal_img)   
         
         # Extend
         proposals_box_list.extend(proposal_bbox)
         resized_images.extend(proposal_image)
         proposals_labels.extend(labels)
         data_list.extend(list(zip(proposal_bbox, labels)))
+        image_idx.extend([counter]*len(labels))
+        assert len(proposal_bbox) != 0, proposal_bbox#########################################
 
         counter += 1
         
     images = torch.tensor(images)
-    return data_list, proposals_box_list, resized_images, proposals_labels, images
+    return data_list, proposals_box_list, resized_images, proposals_labels, images, image_idx
 
 def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3, iou_threshold2=0.7): # 
     labels = []
@@ -224,8 +236,8 @@ def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3
         proposal_x1, proposal_y1, proposal_w, proposal_h = proposal
         proposal_area = proposal_w * proposal_h
 
-        max_iou             = -1 # Initialize max IOU score for each proposal
-        max_label_idx       = -1
+        max_iou         = -1 # Initialize max IOU score for each proposal
+        max_label_idx   = -1
 
         for idx, bbox in enumerate(gt_bboxes):
             bbox_x1, bbox_y1, bbox_w, bbox_h = bbox
@@ -255,7 +267,8 @@ def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3
         if   max_iou <= iou_threshold1: labels.append(0)                            # Object proposal is a negative example
         elif max_iou >= iou_threshold2: labels.append(int(gt_label[max_label_idx])) # Object proposal is a positive example
         else:                           labels.append(-1)                           # Object proposal is not considered
-    if labels.count(0) == len(labels):
+
+    if labels.count(0)+labels.count(-1) == len(labels):
         idx         = proposals_bbox.index(max_iou_failsafe_info[0])
         labels[idx] = int(gt_label[max_iou_failsafe_info[1]])
     # num_ones = len(labels)
@@ -266,12 +279,13 @@ def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3
     return labels
 
 
+
 # %%
 # Main
-ctest = 0
-ctrain = 0
+# ctest = 0
+# ctrain = 0
 patch_size = (128,128)
-batch_size = 64
+batch_size = 100
 
 dataset = WasteDatasetImages(transform=transforms.ToTensor(), resize=(512,512))
 num_classes = dataset.num_categories()
@@ -286,8 +300,8 @@ num_images_to_process_train = len(train_dataset) #Amount of train images to proc
 num_images_to_process_test = len(test_dataset) #Amount of test images to process
 max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
 ### Quick limit for debugging/testing
-# num_images_to_process_train = 8 #Amount of train images to process
-# num_images_to_process_test = 2 #Amount of test images to process
+num_images_to_process_train = 8 #Amount of train images to process
+num_images_to_process_test = 2 #Amount of test images to process
 
 # Create dataloaders for train and test sets
 train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
@@ -297,9 +311,9 @@ test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
 
 print("Generating proposals and labels for train set")
-train_data, train_proposals, train_proposals_image, train_label, images_og = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image, img_shape=patch_size)
-# plot_images_jupyter(images_og, train_proposals, train_label) # Plot with labels
-
+train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image, img_shape=patch_size)
+plot_images_jupyter(images_og, image_idx, train_proposals, train_label) # Plot with labels
+raise Exception()
 
 # Extract the features and their corresponding bounding boxes
 # train_features_flat, train_boxes = zip(*[(feature, bbox) for bbox, feature in train_features])
@@ -320,7 +334,7 @@ val_dl   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
 # Load model
 print("Loading Simple classifier model")
-network = SimpleClassifier(num_classes, )
+network = SimpleClassifier(num_classes, resolution=patch_size[0])
 network.to(device)
 
 network = SimpleClassifier(num_classes=num_classes, resolution=patch_size)
@@ -336,6 +350,7 @@ train(network, optimizer, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
 # if not os.path.exists("models"):
 #     os.makedirs("models")
 # dump(svm, 'models/svm_model.joblib')
+
 
 
 # %%
