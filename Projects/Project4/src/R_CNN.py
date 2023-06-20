@@ -285,65 +285,67 @@ def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3
 # Main
 # ctest = 0
 # ctrain = 0
-patch_size = (128,128)
-batch_size = 100
 
-dataset = WasteDatasetImages(transform=transforms.ToTensor(), resize=(512,512))
-num_classes = dataset.num_categories()
-print(f"Total number of categories: {num_classes}")
+if __name__ == "__main__":
+    patch_size = (128,128)
+    batch_size = 100
 
-# Split the dataset into train and test sets
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    dataset = WasteDatasetImages(transform=transforms.ToTensor(), resize=(512,512))
+    num_classes = dataset.num_categories()
+    print(f"Total number of categories: {num_classes}")
 
-num_images_to_process_train = len(train_dataset) #Amount of train images to process
-num_images_to_process_test = len(test_dataset) #Amount of test images to process
-max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
-### Quick limit for debugging/testing
-# num_images_to_process_train = 8 #Amount of train images to process
-# num_images_to_process_test = 2 #Amount of test images to process
+    # Split the dataset into train and test sets
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-# Create dataloaders for train and test sets
-train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+    num_images_to_process_train = len(train_dataset) #Amount of train images to process
+    num_images_to_process_test = len(test_dataset) #Amount of test images to process
+    max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
+    ### Quick limit for debugging/testing
+    # num_images_to_process_train = 8 #Amount of train images to process
+    # num_images_to_process_test = 2 #Amount of test images to process
 
-# Run selective search 
-ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
+    # Create dataloaders for train and test sets
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-print("Generating proposals and labels for train set")
-train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image, img_shape=patch_size)
-# plot_images_jupyter(images_og, image_idx, train_proposals, train_label) # Plot with labels
-# raise Exception()
+    # Run selective search 
+    ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
 
-# Extract the features and their corresponding bounding boxes
-# train_features_flat, train_boxes = zip(*[(feature, bbox) for bbox, feature in train_features])
-# train_features_flat = list(train_features_flat)
-# train_boxes = list(train_boxes)
+    print("Generating proposals and labels for train set")
+    train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image, img_shape=patch_size)
+    # plot_images_jupyter(images_og, image_idx, train_proposals, train_label) # Plot with labels
+    # raise Exception()
 
-# train_labels = [label for _, label in train_data]
-# train_labels = np.array(train_labels)
+    # Extract the features and their corresponding bounding boxes
+    # train_features_flat, train_boxes = zip(*[(feature, bbox) for bbox, feature in train_features])
+    # train_features_flat = list(train_features_flat)
+    # train_boxes = list(train_boxes)
 
-train_size = int(0.75*len(train_proposals_image))
-test_size = int(0.15*len(train_proposals_image))
-val_size = len(train_proposals_image) - train_size - test_size 
+    # train_labels = [label for _, label in train_data]
+    # train_labels = np.array(train_labels)
 
-train_ds, test_ds, val_ds = random_split(list(zip(train_proposals_image,train_label)), [train_size, test_size, val_size])
-train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True )
-test_dl  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False)
-val_dl   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
+    train_size = int(0.75*len(train_proposals_image))
+    test_size = int(0.15*len(train_proposals_image))
+    val_size = len(train_proposals_image) - train_size - test_size 
 
-# Load model
-print("Loading Simple classifier model")
-network = SimpleClassifier(num_classes, resolution=patch_size[0])
-network.to(device)
+    train_ds, test_ds, val_ds = random_split(list(zip(train_proposals_image,train_label)), [train_size, test_size, val_size])
+    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True )
+    test_dl  = DataLoader(test_ds,  batch_size=batch_size, shuffle=False)
+    val_dl   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
-network = SimpleClassifier(num_classes=num_classes, resolution=patch_size)
-network.to(device)
-learning_rate = 0.01
-optimizer = torch.optim.SGD(network.parameters(), lr=learning_rate)
-loss = F.cross_entropy
-train(network, optimizer, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
+    # Load model
+    print("Loading Simple classifier model")
+    network = SimpleClassifier(num_classes, resolution=patch_size[0])
+    network.to(device)
+
+    network = SimpleClassifier(num_classes=num_classes, resolution=patch_size)
+    network.to(device)
+    learning_rate = 0.01
+    optimizer = torch.optim.SGD(network.parameters(), lr=learning_rate)
+    loss = F.cross_entropy
+    train(network, optimizer, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
 
 
 # print("Training done")
