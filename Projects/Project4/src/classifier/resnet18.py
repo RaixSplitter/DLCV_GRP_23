@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def resnet18(num_classes):
+def resnet50(num_classes):
     model_ft = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
     num_ftrs = model_ft.fc.in_features
     # Here the size of each output sample is set to 2.

@@ -18,14 +18,24 @@ class SimpleClassifier(nn.Module):
         self.conv_block_2 = nn.Sequential(
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
             nn.SiLU(),
-            nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1),
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1),
             nn.SiLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.BatchNorm2d(64),
-            nn.Dropout2d(p=0.05),
+            nn.BatchNorm2d(256),
             )
         
         self.conv_block_3 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, padding=1),
+            nn.SiLU(),
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1),
+            nn.SiLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(128),
+            )
+        
+        self.conv_block_4 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1),
+            nn.SiLU(),
             nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1),
             nn.SiLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
@@ -33,8 +43,7 @@ class SimpleClassifier(nn.Module):
             )
         
         self.fully_connected = nn.Sequential(
-            nn.Dropout(p=0.1),
-            nn.Linear(int(resolution[0]/8)*int(resolution[1]/8)*64, 1024),
+            nn.Linear(int(resolution[0]/16)*int(resolution[1]/16)*64, 1024),
             nn.ReLU(),
             nn.Linear(1024, 512),
             nn.ReLU(),
@@ -48,6 +57,7 @@ class SimpleClassifier(nn.Module):
         x = self.conv_block_1(x)
         x = self.conv_block_2(x)
         x = self.conv_block_3(x)
+        x = self.conv_block_4(x)
         x = x.view(x.size(0),-1)
         x = self.fully_connected(x)
         return x

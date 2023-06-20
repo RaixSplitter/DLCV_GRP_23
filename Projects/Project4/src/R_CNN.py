@@ -14,11 +14,14 @@ from torchvision import transforms
 from torch.nn import functional as F
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from tqdm import tqdm
+import pickle
+import sys
 
 # Own
 from waste_dataset import WasteDatasetImages
 from classifier.simpleCNN import SimpleClassifier
 from classifier.train_classifier import train
+from classifier.resnet18 import resnet50
 
 
 # %%
@@ -221,7 +224,7 @@ def generate_proposals_and_labels(dataloader, ss, num_images_to_process, max_pro
 
         counter += 1
         
-    images = torch.tensor(images)
+    images = torch.tensor(np.array(images))
     return data_list, proposals_box_list, resized_images, proposals_labels, images, image_idx
 
 def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3, iou_threshold2=0.7): # 
@@ -285,7 +288,7 @@ def assign_labels(proposals_bbox, gt_bboxes, gt_label, image, iou_threshold1=0.3
 # ctest = 0
 # ctrain = 0
 patch_size = (128,128)
-batch_size = 100
+batch_size = 128
 
 dataset = WasteDatasetImages(transform=transforms.ToTensor(), resize=(512,512))
 num_classes = dataset.num_categories()
@@ -296,8 +299,8 @@ train_size = int(0.8 * len(dataset))
 test_size = len(dataset) - train_size
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
-num_images_to_process_train = len(train_dataset) #Amount of train images to process
-num_images_to_process_test = len(test_dataset) #Amount of test images to process
+num_images_to_process_train = train_size #Amount of train images to process
+num_images_to_process_test = test_size #Amount of test images to process
 max_proposals_per_image = 1000 # Selective search will generate max 1000 proposals per image
 ### Quick limit for debugging/testing
 # num_images_to_process_train = 8 #Amount of train images to process
@@ -310,10 +313,22 @@ test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 # Run selective search 
 ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
 
-print("Generating proposals and labels for train set")
-train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image, img_shape=patch_size)
-plot_images_jupyter(images_og, image_idx, train_proposals, train_label) # Plot with labels
-raise Exception()
+if len(sys.argv) > 1: 
+    print("Loading proposals and labels for train set")
+    with open(f"./proposals/{sys.argv[1]}.pickle", 'rb') as file:
+        train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx = pickle.load(file)
+else:
+    print("Generating proposals and labels for train set")
+    train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx = generate_proposals_and_labels(train_dataloader, ss, num_images_to_process_train, max_proposals_per_image, img_shape=patch_size)
+    proposal_obj = (train_data, train_proposals, train_proposals_image, train_label, images_og, image_idx)
+    try:
+        with open(f"./proposals/proposals_{num_images_to_process_train}.pickle", "wb") as file:    
+            pickle.dump(proposal_obj, file)
+        print("pickled proposals")
+    except:
+        print("Pickling of proposal failed")
+#plot_images_jupyter(images_og, image_idx, train_proposals, train_label) # Plot with labels
+
 
 # Extract the features and their corresponding bounding boxes
 # train_features_flat, train_boxes = zip(*[(feature, bbox) for bbox, feature in train_features])
@@ -334,15 +349,18 @@ val_dl   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
 # Load model
 print("Loading Simple classifier model")
-network = SimpleClassifier(num_classes, resolution=patch_size[0])
-network.to(device)
+#network = SimpleClassifier(num_classes)
+#network.to(device)
 
-network = SimpleClassifier(num_classes=num_classes, resolution=patch_size)
+#network = SimpleClassifier(num_classes=num_classes, resolution=patch_size)
+network = resnet50(num_classes=num_classes)
+if len(sys.argv) > 2:
+    network.load_state_dict(torch.load(f'./trained_models/{sys.argv[2]}.pth'))
 network.to(device)
 learning_rate = 0.01
-optimizer = torch.optim.SGD(network.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(network.parameters(), lr=learning_rate)
 loss = F.cross_entropy
-train(network, optimizer, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
+train(network, optimizer, learning_rate, 25, loss, train_dl, test_dl, val_dl, len(train_ds), len(test_ds))
 
 
 # print("Training done")

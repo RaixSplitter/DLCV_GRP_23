@@ -5,10 +5,12 @@ import json
 from torchvision import datasets, transforms
 from torch.utils.data import Dataset, DataLoader, random_split
 from PIL import Image
+import matplotlib.pyplot as plt
 
 DATA_PATH = "/dtu/datasets1/02514/data_wastedetection"
-ALL_SUPERCATEGORIES = ["Background", "Aluminium foil", "Bottle", "Bottle cap", "Broken glass", "Can", "Carton", "Cup", "Lid", "Other plastic", "Paper", "Plastic bag & wrapper", "Plastic container", "Pop tab", "Straw", "Styrofoam piece", "Unlabeled litter", "Cigarette"]
-SUPERCATEGORIES = ["Background", "Bottle", "Bottle cap", "Can", "Carton", "Plastic bag & wrapper", "Unlabeled litter", "Cigarette"]
+ALL_SUPERCATEGORIES = ["Background", "Aluminium foil", "Bottle", "Bottle cap", "Broken glass", "Can", "Carton", "Cup", "Lid", "Other plastic", "Paper", "Plastic bag & wrapper", "Plastic container", "Pop tab", "Straw", "Styrofoam piece", "Unlabeled litter", "Cigarette", "Plastic utensils", "Rope & strings", "Paper bag", "Scrap metal", "Food waste", "Shoe", "Squeezable tube", "Blister pack", "Glass jar", "Plastic glooves", "Battery"]
+#SUPERCATEGORIES = ["Background", "Bottle", "Bottle cap", "Can", "Carton", "Plastic bag & wrapper", "Unlabeled litter", "Cup", "Straw", "Paper", "Broken glass"]
+SUPERCATEGORIES = ALL_SUPERCATEGORIES
 UNLABELED = SUPERCATEGORIES.index("Unlabeled litter")
 
 class WasteDatasetPatches(Dataset):
@@ -22,6 +24,14 @@ class WasteDatasetPatches(Dataset):
         self.img_info = data['images']
         self.annotation = data['annotations']
         self.categories = data['categories']
+        self.cat_size = {}
+        for item in self.annotation:
+            supercat = self.categories[item['category_id']]['supercategory']
+            #if we're not using the class (not in supercategories list), set to unlabeled
+            label = SUPERCATEGORIES.index(supercat) if supercat in SUPERCATEGORIES else UNLABELED
+            if label in self.cat_size.keys():
+                self.cat_size[label] += 1
+            else: self.cat_size[label] = 0
     
     def __len__(self):
         return len(self.annotation)
@@ -49,6 +59,17 @@ class WasteDatasetPatches(Dataset):
     
     def category_name(self, label):
         return SUPERCATEGORIES[label]
+    
+    def category_size(self, label):
+        return self.cat_size[label] if label in self.cat_size.keys() else 0
+    
+    def save_category_count_plot(self):
+        sorted_sizes = sorted(self.cat_size.items(), key=lambda x: x[1], reverse=False)
+        keys = [SUPERCATEGORIES[item[0]] for item in sorted_sizes]
+        values = [item[1] for item in sorted_sizes]
+        plt.barh(keys, values)
+        plt.tight_layout()
+        plt.savefig('bars.png')
 
 class WasteDatasetImages(Dataset):
     def __init__(self, transform=None, resize=(224,224)):
