@@ -27,7 +27,7 @@ import torch
 
 
 
-def plot_images(dataloader):
+def plot_images(dataloader, output_dir):
     num_images_to_process = 10
     for idx, (image, bboxes) in enumerate(dataloader):
         if idx >= num_images_to_process:

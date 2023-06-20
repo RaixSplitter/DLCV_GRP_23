@@ -7,7 +7,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from PIL import Image
 
 DATA_PATH = "/dtu/datasets1/02514/data_wastedetection"
-SUPERCATEGORIES = ["Background", "Aluminium foil", "Bottle", "Bottle cap", "Broken glass", "Can", "Carton", "Cup", "Lid", "Other plastic", "Paper", "Plastic bag & wrapper", "Plastic container", "Pop tab", "Straw", "Styrofoam piece", "Unlabeled litter", "Cigarette"]
+ALL_SUPERCATEGORIES = ["Background", "Aluminium foil", "Bottle", "Bottle cap", "Broken glass", "Can", "Carton", "Cup", "Lid", "Other plastic", "Paper", "Plastic bag & wrapper", "Plastic container", "Pop tab", "Straw", "Styrofoam piece", "Unlabeled litter", "Cigarette"]
+SUPERCATEGORIES = ["Background", "Bottle", "Bottle cap", "Can", "Carton", "Plastic bag & wrapper", "Unlabeled litter", "Cigarette"]
 UNLABELED = SUPERCATEGORIES.index("Unlabeled litter")
 
 class WasteDatasetPatches(Dataset):

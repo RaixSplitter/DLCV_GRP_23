@@ -16,7 +16,8 @@ from sklearn.metrics import f1_score
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 from waste_dataset import WasteDatasetPatches
-
+from simpleCNN import SimpleClassifier
+from resnet18 import resnet18
 
 #Setup Device
 if torch.cuda.is_available():
@@ -25,7 +26,7 @@ else:
     print("The code will run on CPU.")
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl, train_size):
+def train(model, optimizer, learning_rate, epochs, loss_func, train_dl, test_dl, val_dl, train_size):
     model.to(device)
     out_dict = {'train_acc': [],
               'test_acc': [],
@@ -35,6 +36,9 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl, train_
               'test_f1': []}
     
     for epoch in range(epochs):
+        if epoch%10 == 0: 
+            learning_rate = learning_rate*0.1
+            optimizer = torch.optim.SGD(network.parameters(), lr=learning_rate)
         model.train()
         train_correct = 0
         train_loss = []
@@ -81,7 +85,7 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl, train_
         out_dict['test_f1'].append(test_f1)
 
         if (epoch + 1) % 5 == 0:
-            torch.save(model.state_dict(), os.path.join('trained_models',f'class_model_{epoch+1}.pth'))
+            torch.save(model.state_dict(), os.path.join('trained_models',f'resnet18_model_{epoch+1}.pth'))
 
         print(f"Loss train: {np.mean(train_loss):.3f}\t test: {np.mean(test_loss):.3f}\t",
               f"Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%\t test: {out_dict['test_acc'][-1]*100:.1f}%\t",
@@ -90,16 +94,15 @@ def train(model, optimizer, epochs, loss_func, train_dl, test_dl, val_dl, train_
         
         logging.info(f"Epoch: {epoch}, Loss train: {np.mean(train_loss):.3f}, Loss test: {np.mean(test_loss):.3f}, Accuracy train: {out_dict['train_acc'][-1]*100:.1f}%, Accuracy test: {out_dict['test_acc'][-1]*100:.1f}%, F1 train: {out_dict['train_f1'][-1]*100:.1f}%, F1 test: {out_dict['test_f1'][-1]*100:.1f}%")
 
-    torch.save(model.state_dict(), os.path.join('trained_models',f'_class_final_model.pth'))
+    torch.save(model.state_dict(), os.path.join('trained_models',f'resnet18_final_model.pth'))
     logging.info(f"RUN FINISHED")
     return out_dict
 
 if __name__ == '__main__':
-    from simpleCNN import SimpleClassifier
     patch_size = (64,64)
     data = WasteDatasetPatches(resolution=patch_size)
-    train_size = int(0.75*len(data))
-    test_size = int(0.15*len(data))
+    train_size = int(0.60*len(data))
+    test_size = int(0.20*len(data))
     val_size = len(data) - train_size - test_size
 
     train_ds, test_ds, val_ds = random_split(data, [train_size, test_size, val_size])
@@ -107,10 +110,17 @@ if __name__ == '__main__':
     test_dl = DataLoader(test_ds, batch_size=128, shuffle=False)
     val_dl = DataLoader(val_ds, batch_size=128, shuffle=False)
 
-    network = SimpleClassifier(num_classes=data.num_categories(), resolution=patch_size)
+    #network = SimpleClassifier(num_classes=data.num_categories(), resolution=patch_size)
+    network = resnet18(data.num_categories())
+    if len(sys.argv) > 1:
+        try:
+            network.load_state_dict(torch.load(f'./trained_models/{sys.argv[1]}.pth'))
+        except:
+            print(f'no network saved at trained_models/{sys.argv[1]}.pth')
     network.to(device)
     learning_rate = 0.01
-    optimizer = torch.optim.SGD(network.parameters(), lr=learning_rate)
-
+    optimizer = torch.optim.Adam(network.parameters(), lr=learning_rate)
+    
     loss = F.cross_entropy
-    train(network, optimizer, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
+
+    train(network, optimizer, learning_rate, 25, loss, train_dl, test_dl, val_dl, len(train_ds))
