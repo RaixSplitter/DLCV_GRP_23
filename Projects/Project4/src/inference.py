@@ -18,35 +18,59 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import glob
 
 # Own
-from waste_dataset import WasteDatasetImages
-from classifier.resnet18 import resnet18, resnet18_inference
+from waste_dataset import WasteDatasetImages, SUPERCATEGORIES
+from classifier.resnet18 import resnet18#, resnet18_inference # Error?
 from R_CNN import* 
 from utility import*
 # %%
 # Main
 
-def plot_image_with_boxes(image, bboxes, labels, title, filename):
-    fig, ax = plt.subplots(1)
-    ax.imshow(image)
-    colors = ['r', 'g', 'b', 'y', 'm', 'c', 'k', 'w']
+threshold_iou = 0.3
+def plot_image_with_boxes(gt_dict_info, pred_dict_info, name):
+    os.makedirs("Projects/Project4/src/output_images", exist_ok=True)
+    colors = ['r', 'g', 'b', 'y', 'm', 'c']
+    fig, ax = plt.subplots(1,2,)
     
-    for i, (bbox, label) in enumerate(zip(bboxes, labels)):
-        x1, y1, x2, y2 = bbox
-        width = x2 - x1
-        height = y2 - y1
-        rect = patches.Rectangle((x1, y1), width, height, linewidth=1, edgecolor=colors[i % len(colors)], facecolor='none')
-        ax.add_patch(rect)
-        ax.text(x1, y1, str(label), color=colors[i % len(colors)])
+    # for idx, (used_dict,text) in enumerate(zip([gt_dict_info, pred_dict_info],[,])):
+    ax[0].imshow(gt_dict_info["image"].transpose(1, 2, 0))
+    gt_info = []
+    for i, (bbox, label) in enumerate(zip(gt_dict_info["bbox"], gt_dict_info["label"])):
+        x, y, w, h = bbox
+        rect = patches.Rectangle((x, y), w, h, linewidth=1.5, edgecolor=colors[i % len(colors)], facecolor='none')
+        ax[0].add_patch(rect)
+        ax[0].text(x, y+h+15, str(label), color="white", fontsize=10, va="bottom", bbox=dict(facecolor='black', alpha=1))
+        ax[0].xaxis.set_visible(False)
+        ax[0].yaxis.set_visible(False)
+        ax[0].set_title("Ground Truth\n")
+        gt_info.append([bbox, label])
 
-    plt.title(title)
-    plt.savefig(filename)
-    plt.close()
+    pred_bbox, pred_lab, pred_p = pred_dict_info["bbox"], pred_dict_info["label"], pred_dict_info["p"]
+    pred_bboxes = [[bbox, lab, prop] for bbox, lab, prop in zip(pred_bbox, pred_lab, pred_p)]
+    # raise Exception([print(b) for b in pred_bboxes])
+    bbox_new = no_max_supression(pred_bboxes, 0.4)
+    # raise Exception([print(b) for b in bbox_new])
+    
+    ax[1].imshow(pred_dict_info["image"].transpose(1, 2, 0))
+    for i, (bbox, label, _) in enumerate(bbox_new):
+        x, y, w, h = bbox
+        rect = patches.Rectangle((x, y), w, h, linewidth=1.5, edgecolor=colors[label % len(colors)], facecolor='none')
+        ax[1].add_patch(rect)
+        ax[1].text(x, y+h+15, str(label), color="white", fontsize=10, va="bottom", bbox=dict(facecolor='black', alpha=1))
+        ax[1].xaxis.set_visible(False)
+        ax[1].yaxis.set_visible(False)
+        ax[1].set_title("Prediction\n")
+    # raise Exception(len(gt_info), len(pred_bboxes),len(bbox_new))
+    # raise Exception(gt_info,bbox_new)
+    average_precision, precision, recall = mean_average_precision(gt_info, bbox_new,threshold_iot=threshold_iou)
+
+    plt.tight_layout()
+    plt.suptitle(f"Threshold IoU: {threshold_iou}\n Precision: {precision}\nAverage_precision: {average_precision}\nRecall: {recall}\n\n")
+    plt.savefig(f"Projects/Project4/src/output_images/{name}.png")
 
 if __name__ == "__main__":
-    ctest = 0
-    ctrain = 0
     patch_size = (64,64)
     batch_size = 32
 
@@ -66,40 +90,19 @@ if __name__ == "__main__":
     # Create dataloaders for train and test sets
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
     test_dataloader  = DataLoader(test_dataset,  batch_size=1, shuffle=False)
-    real_bbox_label_pairs = []
-    real_bbox_label_image_vis = []  # for visualization purposes
-
-    predicted_bbox_label_vis = []  # for visualization purposes
-
-
-    for batch in test_dataloader:
-        if ctest >= num_images_to_process_test:
-            break
-        images, bboxes, labels = batch
-        for bbox, label in zip(bboxes, labels):
-            bbox = [coord.item() for coord in bbox]  # Convert tensor to scalar
-            real_bbox_label_pairs.append([bbox, label.item()])
-            
-            # For visualization
-            if ctest < 20:  # Only for the first 5 images
-                real_bbox_label_image_vis.append({
-                    "image": images[0].numpy(),  # Convert tensor to numpy array
-                    "bbox": bbox,
-                    "label": label.item()
-                })
-        ctest += 1
 
     # Run selective search 
     ss = cv2.ximgproc.segmentation.createSelectiveSearchSegmentation()
 
-    print("inference")
+    print("Inference")
 
-    model = resnet18_inference(8)  # Replace with your actual model class
-    model.load_state_dict(torch.load("trained_models/resnet18_model_10.pth"))
+    # model = resnet18_inference(8)  # Replace with your actual model class
+    model = resnet18(num_classes)  # Replace with your actual model class
+    # model.load_state_dict(torch.load("trained_models/resnet18_model_10.pth"))
     model.eval()
 
-
-    _, proposals_box_list, resized_images, _, _, proposals_per_image, image_idx = generate_proposals_and_labels(test_dataloader, ss, num_images_to_process_test, max_proposals_per_image)
+    #train_data, train_proposals,    train_proposals_image, train_label, images_og, image_idx
+    _, proposals_box_list, resized_images, proposals_label,  _, image_idx = generate_proposals_and_labels(test_dataloader, ss, num_images_to_process_test, max_proposals_per_image, img_shape=patch_size)
 
     resized_images_array = np.array(resized_images, dtype=np.float32)
     resized_images_tensor = torch.from_numpy(resized_images_array)
@@ -117,44 +120,48 @@ if __name__ == "__main__":
         if label != 0:
             probability = probabilities[i][label].item()
             bbox_label_pairs.append([bbox, label, probability])
+    # probabilities[0][7].item()
+    
+    ctest = 0
+    ctrain = 0
+    real_bbox_label_pairs = []      # list[list[float], int]
+    real_bbox_label_image_vis = []  # for visualization purposes
+    predicted_bbox_label_vis  = [] # for visualization purposes
 
-    predicted_bbox_label_vis_per_image = []  # Store the predicted bounding boxes and labels per image
-    current_index = 0
+    counting = 0
+    visited  = 0
 
-    for img_bboxes in proposals_per_image:
-        img_predictions = []
-        for bbox in img_bboxes:
-            label = predicted_labels[current_index].item()
-            if label != 0:
-                probability = probabilities[current_index][label].item()
-                img_predictions.append([bbox, label])
-            current_index += 1
-        predicted_bbox_label_vis_per_image.append(img_predictions)
-
-    print("Real bounding box and label pairs for visualization: ", real_bbox_label_image_vis)
-    print("Predicted bounding box and label pairs for visualization: ", predicted_bbox_label_vis_per_image)
-
-    print("bbox before no max", bbox_label_pairs)
-
-    bbox_new = no_max_supression(bbox_label_pairs, 0.5)
-    print("bbox after no max", bbox_new)
-    average_precision, precision, recall = mean_average_precision(real_bbox_label_pairs, bbox_new)
-    print("average_precision", average_precision)
-    print("precision", precision)
-    print("recall", recall)
-
-    os.makedirs("plots", exist_ok=True)
-    for idx, (real_data, pred_data) in enumerate(zip(real_bbox_label_image_vis, predicted_bbox_label_vis_per_image)):
-        image = real_data["image"].transpose(1, 2, 0)  # Transpose the image to the HWC format
-
-        # Unpack the real bounding boxes and labels
-        real_bboxes = [real_data["bbox"]]
-        real_labels = [real_data["label"]]
-
-        # Unpack the predicted bounding boxes and labels
-        pred_bboxes = [pred[0] for pred in pred_data]
-        pred_labels = [pred[1] for pred in pred_data]
-
-        # Plot and save the image with the real and predicted bounding boxes
-        plot_image_with_boxes(image, real_bboxes, real_labels, "Real", f"plots/real_{idx}.png")
-        plot_image_with_boxes(image, pred_bboxes, pred_labels, "Predicted", f"plots/predicted_{idx}.png")
+    for batch in test_dataloader:
+        if ctest >= num_images_to_process_test:
+            break
+        images, bboxes, labels = batch
+        for idx in range(len(bboxes)):
+            bboxes[idx] = [coord.item() for coord in bboxes[idx]]  # Convert tensor to scalar
+            real_bbox_label_pairs.append([bboxes[idx], labels[idx].item()])
+            
+        real_bbox_label_image_vis.append({
+            "image": images[0].numpy(),  # Convert tensor to numpy array
+            "bbox": bboxes,
+            "label": [label.item() for label in labels]
+        })
+        bboxes, labels, predictions_p = [],[],[]
+        for _ in range(image_idx.count(counting)):
+            if proposals_label[visited] == 0:
+                visited += 1
+                continue
+            bboxes.append(proposals_box_list[visited])
+            labels.append(proposals_label[visited])
+            predictions_p.append(probabilities[visited].max().item())
+            visited += 1
+        predicted_bbox_label_vis.append({
+            "image": images[0].numpy(),  # Convert tensor to numpy array
+            "bbox": bboxes,
+            "label": labels,
+                "p": predictions_p
+        })
+        counting += 1
+        ctest += 1
+    
+    file_count = len(glob.glob("Projects/Project4/src/output_images/*"))
+    for idx in range(8):
+        plot_image_with_boxes(real_bbox_label_image_vis[idx], predicted_bbox_label_vis[idx], f"GT_vs_pred_{idx+file_count}")
